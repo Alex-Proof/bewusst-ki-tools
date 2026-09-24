@@ -1,0 +1,2456 @@
+<!DOCTYPE html>
+<html lang="de" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ALEX Prompt- & Content-Studio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    .tab-active { border-bottom: 2px solid #6366f1; color: #818cf8; background-color: rgba(99,102,241,0.05); }
+    details > summary { cursor: pointer; list-style: none; }
+    details > summary::-webkit-details-marker { display: none; }
+    .drop-zone { border: 2px dashed #334155; transition: all 0.2s; }
+    .drop-zone.dragover { border-color: #6366f1; background: rgba(99,102,241,0.08); }
+    pre { white-space: pre-wrap; word-break: break-word; }
+  </style>
+</head>
+<body class="h-full font-sans antialiased bg-slate-950 text-slate-100 flex flex-col">
+
+  <!-- Toast -->
+  <div id="toast" class="fixed top-5 right-5 z-50 transform transition-all duration-300 translate-y-[-100px] opacity-0 pointer-events-none flex items-center gap-3 bg-slate-800 border border-slate-700 text-slate-100 px-4 py-3 rounded-xl shadow-2xl">
+    <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+    <span id="toast-message" class="text-sm font-medium">Erledigt!</span>
+  </div>
+
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-black text-xl shadow-lg shadow-indigo-500/20">🧭</div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight bg-gradient-to-r from-indigo-300 via-purple-300 to-pink-300 bg-clip-text text-transparent">ALEX Prompt- & Content-Studio</h1>
+          <p class="text-xs text-slate-400">Prompts · Kontext · CLAUDE.md · Content · Plan · Session · Genesis</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <a href="https://bewusstki.de/werkzeuge.html" class="text-xs text-slate-400 hover:text-slate-200 px-2 py-1">↖ Werkzeuge</a>
+        <a href="alex-fehler-labor.html" class="text-xs text-slate-400 hover:text-slate-200 px-2 py-1">→ Fehler-Labor</a>
+        <button onclick="toggleApiKeyModal()" class="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-2 transition">
+          <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 0121 9z"></path></svg>
+          <span id="api-key-status">DeepSeek: Standard</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- CORS Notice -->
+  <div class="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-4">
+    <details class="bg-amber-950/30 border border-amber-900/60 rounded-xl">
+      <summary class="p-3 text-xs text-amber-300 font-medium">⚠️ DeepSeek / Gemini CORS-Hinweis — klick für Proxy-Lösung</summary>
+      <div class="px-3 pb-3 text-[11px] text-slate-400 leading-relaxed space-y-2">
+        <p>Browser blockieren direkte Anfragen von lokalen Dateien an externe APIs (CORS). Für DeepSeek und Gemini brauchst du entweder einen eigenen kleinen Proxy (z.B. ein lokales Node-Skript, das die Anfrage weiterleitet) oder die Keys bleiben clientseitig (mit CORS-Risiko, nur für den eigenen Gebrauch geeignet).</p>
+      </div>
+    </details>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-3">
+    <div class="border-b border-slate-800 flex overflow-x-auto space-x-1 text-sm font-medium">
+      <button onclick="switchTab('prompt')" id="tab-btn-prompt" class="tab-btn tab-active px-4 py-2.5 rounded-lg flex items-center gap-2 whitespace-nowrap transition">🎯 <span>Prompt</span></button>
+      <button onclick="switchTab('context')" id="tab-btn-context" class="tab-btn text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2.5 rounded-lg flex items-center gap-2 whitespace-nowrap transition">🧠 <span>Kontext</span></button>
+      <button onclick="switchTab('claudemd')" id="tab-btn-claudemd" class="tab-btn text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2.5 rounded-lg flex items-center gap-2 whitespace-nowrap transition">🛡️ <span>CLAUDE.md</span></button>
+      <button onclick="switchTab('hooks')" id="tab-btn-hooks" class="tab-btn text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2.5 rounded-lg flex items-center gap-2 whitespace-nowrap transition">🪝 <span>Hooks</span></button>
+      <button onclick="switchTab('content')" id="tab-btn-content" class="tab-btn text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2.5 rounded-lg flex items-center gap-2 whitespace-nowrap transition">📢 <span>Content</span></button>
+      <button onclick="switchTab('plan')" id="tab-btn-plan" class="tab-btn text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2.5 rounded-lg flex items-center gap-2 whitespace-nowrap transition">🗺️ <span>Plan-Modus</span></button>
+      <button onclick="switchTab('session')" id="tab-btn-session" class="tab-btn text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2.5 rounded-lg flex items-center gap-2 whitespace-nowrap transition">🔍 <span>Session-Analyse</span></button>
+      <button onclick="switchTab('genesis')" id="tab-btn-genesis" class="tab-btn text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2.5 rounded-lg flex items-center gap-2 whitespace-nowrap transition">📜 <span>Genesis</span></button>
+      <button onclick="switchTab('meta')" id="tab-btn-meta" class="tab-btn text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2.5 rounded-lg flex items-center gap-2 whitespace-nowrap transition">🧬 <span>Modelle</span></button>
+    </div>
+  </nav>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+    <!-- ==================== TAB: PROMPT ==================== -->
+    <section id="tab-prompt" class="tab-content grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div class="lg:col-span-6 space-y-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+          <h2 class="text-base font-semibold text-slate-100">Was willst du bauen oder ändern?</h2>
+          <textarea id="task-input" rows="5" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 font-mono placeholder:text-slate-600" placeholder="z.B. Fix den Bug im Event-Handler der Registrierung. Validierung schlägt fehl wenn PLZ leer ist."></textarea>
+
+          <label class="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800/80 cursor-pointer text-xs">
+            <input type="checkbox" id="use-context" checked class="rounded border-slate-700 text-indigo-600">
+            <span>Gespeicherten Projekt-Kontext einbeziehen (<span id="context-count-inline">0</span> Einträge)</span>
+          </label>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Ziel-Modell</label>
+            <select id="target-model" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+              <option value="">Generisch / kein spezifisches Modell</option>
+              <option value="claude-code">Claude Code</option>
+              <option value="devin">Devin</option>
+              <option value="cursor">Cursor</option>
+              <option value="openhands">OpenHands</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Sicherheits-Leitplanken</label>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950 border border-slate-800/80 cursor-pointer"><input type="checkbox" id="g-plan" checked class="rounded border-slate-700 text-indigo-600"><span>Erst planen, dann ändern</span></label>
+              <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950 border border-slate-800/80 cursor-pointer"><input type="checkbox" id="g-test" checked class="rounded border-slate-700 text-indigo-600"><span>Keine Test-/Mock-Manipulation</span></label>
+              <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950 border border-slate-800/80 cursor-pointer"><input type="checkbox" id="g-files" checked class="rounded border-slate-700 text-indigo-600"><span>Max. 2-3 Dateien</span></label>
+              <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950 border border-slate-800/80 cursor-pointer"><input type="checkbox" id="g-refactor" checked class="rounded border-slate-700 text-indigo-600"><span>Kein ungefragtes Refactoring</span></label>
+              <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950 border border-slate-800/80 cursor-pointer"><input type="checkbox" id="g-git" checked class="rounded border-slate-700 text-indigo-600"><span>Git-Checkpoint vorher</span></label>
+              <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950 border border-slate-800/80 cursor-pointer"><input type="checkbox" id="g-exit" checked class="rounded border-slate-700 text-indigo-600"><span>Exit-Codes prüfen</span></label>
+              <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950 border border-slate-800/80 cursor-pointer"><input type="checkbox" id="g-demo" checked class="rounded border-slate-700 text-indigo-600"><span>Kein Demo-Theater</span></label>
+              <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950 border border-slate-800/80 cursor-pointer"><input type="checkbox" id="g-sed" checked class="rounded border-slate-700 text-indigo-600"><span>Kein sed auf Code</span></label>
+              <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950 border border-slate-800/80 cursor-pointer sm:col-span-2"><input type="checkbox" id="g-verify" checked class="rounded border-slate-700 text-indigo-600"><span>Vertrauensregel: keine Behauptung ohne Live-Verifikation</span></label>
+            </div>
+          </div>
+
+          <div class="flex gap-2">
+            <button onclick="generatePrompt()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 px-4 rounded-xl text-sm transition">⚡ Prompt generieren</button>
+            <button onclick="enhancePromptWithAI()" id="ai-enhance-btn" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-indigo-300 font-medium py-2.5 px-4 rounded-xl text-sm transition">✨ KI-optimieren</button>
+          </div>
+          <button onclick="sendPromptToContent()" class="w-full bg-emerald-700/80 hover:bg-emerald-600 text-white font-medium py-2 px-4 rounded-xl text-sm transition">📢 Prompt → Content-Generator übernehmen</button>
+        </div>
+      </div>
+
+      <div class="lg:col-span-6 space-y-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl h-full flex flex-col">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-semibold text-slate-200">📋 Fertiger Prompt</h3>
+            <div class="flex gap-2">
+              <button onclick="copyElementText('prompt-output')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition">Kopieren</button>
+              <button onclick="downloadText('claude-prompt.txt', document.getElementById('prompt-output').innerText)" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs px-3 py-1.5 rounded-lg font-medium transition">⬇ Download</button>
+            </div>
+          </div>
+          <pre id="prompt-output" class="flex-1 min-h-[300px] bg-slate-950 border border-slate-800 rounded-xl p-4 text-xs font-mono text-emerald-400 whitespace-pre-wrap overflow-y-auto leading-relaxed">Klicke "Prompt generieren"...</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB: CONTEXT ==================== -->
+    <section id="tab-context" class="tab-content hidden grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div class="lg:col-span-5 space-y-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
+          <h2 class="text-base font-semibold text-slate-100">Kontext-Eintrag hinzufügen</h2>
+          <p class="text-xs text-slate-400">Paste Session-Ergebnisse, Entscheidungen, Architektur-Fakten – oder lade MD-Bauanleitungen hoch.</p>
+          <input id="ctx-label" type="text" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500" placeholder="Kurzer Titel, z.B. 'Guardian OS Phase 1'">
+          <textarea id="ctx-text" rows="5" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-mono" placeholder="Was ist wichtig zu wissen? Fakten, Entscheidungen, Stolperfallen..."></textarea>
+          <button onclick="addContextEntry()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 px-4 rounded-xl text-sm transition">+ Zum Kontext hinzufügen</button>
+
+          <!-- MD Upload -->
+          <div class="pt-3 border-t border-slate-800 space-y-2">
+            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">MD / Bauanleitung hochladen</label>
+            <div id="md-drop-zone" class="drop-zone rounded-xl p-4 text-center text-xs text-slate-400 cursor-pointer" onclick="document.getElementById('md-file-input').click()">
+              <p>📄 .md Datei hier ablegen oder klicken</p>
+              <p class="text-[10px] text-slate-500 mt-1">Bauanleitungen, Specs, Notizen → werden als Kontext gespeichert</p>
+              <input type="file" id="md-file-input" accept=".md,.markdown,.txt" class="hidden" onchange="handleMdUpload(event)">
+            </div>
+            <button onclick="generatePromptFromContext()" class="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-indigo-300 font-medium py-2 px-4 rounded-xl text-sm transition">⚡ Prompt aus Kontext generieren</button>
+          </div>
+
+          <div class="flex gap-2 pt-1">
+            <button onclick="exportContext()" class="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs px-3 py-2 rounded-lg">⬇ Kontext exportieren</button>
+            <label class="flex-1 text-center bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs px-3 py-2 rounded-lg cursor-pointer">
+              ⬆ Importieren
+              <input type="file" accept=".json" class="hidden" onchange="importContext(event)">
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="lg:col-span-7 space-y-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-semibold text-slate-200">📚 Gespeicherter Kontext (<span id="context-count">0</span>)</h3>
+            <button onclick="clearAllContext()" class="text-xs text-rose-400 hover:text-rose-300">Alles löschen</button>
+          </div>
+          <div id="context-list" class="space-y-2 max-h-[600px] overflow-y-auto"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB: CLAUDE.MD ==================== -->
+    <section id="tab-claudemd" class="tab-content hidden grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div class="lg:col-span-6 space-y-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4 text-xs">
+          <h2 class="text-base font-semibold text-slate-100">🛡️ CLAUDE.md Generator & Säuberung</h2>
+
+          <!-- Upload existing -->
+          <div class="space-y-2">
+            <label class="block font-semibold text-slate-300 uppercase tracking-wider">Bestehende CLAUDE.md hochladen</label>
+            <div class="drop-zone rounded-xl p-3 text-center text-slate-400 cursor-pointer" onclick="document.getElementById('claude-md-upload').click()">
+              <p>📄 CLAUDE.md ablegen oder klicken</p>
+              <input type="file" id="claude-md-upload" accept=".md,.markdown,.txt" class="hidden" onchange="handleClaudeMdUpload(event)">
+            </div>
+            <textarea id="claude-md-raw" rows="4" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 font-mono" placeholder="Oder hier bestehende CLAUDE.md einfügen..."></textarea>
+            <div class="flex gap-2">
+              <button onclick="cleanClaudeMd()" class="flex-1 bg-amber-700 hover:bg-amber-600 text-white font-medium py-2 px-3 rounded-xl text-sm transition">🧹 Säubern / Härten</button>
+              <button onclick="loadClaudeMdIntoGenerator()" class="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm py-2 px-3 rounded-xl transition">→ In Generator laden</button>
+            </div>
+          </div>
+
+          <div class="border-t border-slate-800 pt-3">
+            <label class="block font-semibold text-slate-300 uppercase tracking-wider mb-1">Tech Stack</label>
+            <input id="cmd-stack" type="text" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:outline-none focus:border-indigo-500" value="TypeScript, Node.js, Express, React, SQLite">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-300 uppercase tracking-wider mb-1">Test-/Build-Befehl</label>
+            <input id="cmd-test" type="text" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:outline-none focus:border-indigo-500" value="npx tsc --noEmit && npx vitest run">
+          </div>
+          <div class="space-y-2">
+            <label class="flex items-center gap-2 p-2 bg-slate-950 border border-slate-800 rounded-lg cursor-pointer"><input type="checkbox" id="r-test" checked class="rounded border-slate-700 text-indigo-600"><span>Niemals fehlschlagende Tests anpassen.</span></label>
+            <label class="flex items-center gap-2 p-2 bg-slate-950 border border-slate-800 rounded-lg cursor-pointer"><input type="checkbox" id="r-exit" checked class="rounded border-slate-700 text-indigo-600"><span>Bei Shell-Befehlen stderr + Exit-Codes prüfen.</span></label>
+            <label class="flex items-center gap-2 p-2 bg-slate-950 border border-slate-800 rounded-lg cursor-pointer"><input type="checkbox" id="r-secrets" checked class="rounded border-slate-700 text-indigo-600"><span>Keine Secrets/.env lesen oder loggen.</span></label>
+            <label class="flex items-center gap-2 p-2 bg-slate-950 border border-slate-800 rounded-lg cursor-pointer"><input type="checkbox" id="r-demo" checked class="rounded border-slate-700 text-indigo-600"><span>Kein Demo-Theater / Fake-Daten.</span></label>
+            <label class="flex items-center gap-2 p-2 bg-slate-950 border border-slate-800 rounded-lg cursor-pointer"><input type="checkbox" id="r-sed" checked class="rounded border-slate-700 text-indigo-600"><span>Kein sed/Regex auf Code-Dateien.</span></label>
+            <label class="flex items-center gap-2 p-2 bg-slate-950 border border-slate-800 rounded-lg cursor-pointer"><input type="checkbox" id="r-atomic" checked class="rounded border-slate-700 text-indigo-600"><span>Minimale Diffs, kein ungefragtes Refactoring.</span></label>
+            <label class="flex items-center gap-2 p-2 bg-slate-950 border border-slate-800 rounded-lg cursor-pointer"><input type="checkbox" id="r-verify" checked class="rounded border-slate-700 text-indigo-600"><span>Vertrauensregel: Keine Behauptung ohne Live-Verifikation.</span></label>
+            <label class="flex items-center gap-2 p-2 bg-slate-950 border border-slate-800 rounded-lg cursor-pointer"><input type="checkbox" id="r-hitl" checked class="rounded border-slate-700 text-indigo-600"><span>Human-in-the-Loop bei CLAUDE.md-Änderungen.</span></label>
+            <label class="flex items-center gap-2 p-2 bg-slate-950 border border-slate-800 rounded-lg cursor-pointer"><input type="checkbox" id="r-context" checked class="rounded border-slate-700 text-indigo-600"><span>Gespeicherten Kontext als Anhang einfügen.</span></label>
+          </div>
+          <button onclick="generateClaudeMd()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 px-4 rounded-xl text-sm transition">📝 CLAUDE.md generieren</button>
+        </div>
+      </div>
+      <div class="lg:col-span-6 space-y-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl h-full flex flex-col">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-semibold text-slate-200">📄 Vorschau</h3>
+            <div class="flex gap-2">
+              <button onclick="copyElementText('claude-md-output')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition">Kopieren</button>
+              <button onclick="downloadText('CLAUDE.md', document.getElementById('claude-md-output').innerText)" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs px-3 py-1.5 rounded-lg font-medium transition">⬇ Download</button>
+            </div>
+          </div>
+          <pre id="claude-md-output" class="flex-1 min-h-[300px] bg-slate-950 border border-slate-800 rounded-xl p-4 text-xs font-mono text-cyan-300 whitespace-pre-wrap overflow-y-auto leading-relaxed">Klicke "CLAUDE.md generieren" oder lade eine bestehende hoch...</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB: HOOKS ==================== -->
+    <section id="tab-hooks" class="tab-content hidden grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div class="lg:col-span-6 space-y-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
+          <h2 class="text-base font-semibold text-slate-100">🪝 Hook-Bibliothek</h2>
+          <p class="text-xs text-slate-400">Auswählen, was rein soll. Alle Hooks landen in <code>.claude/settings.json</code>. PreToolUse mit exit 2 blockiert wirklich.</p>
+          <div id="hook-checkboxes" class="space-y-2 text-xs"></div>
+          <div class="pt-2 border-t border-slate-800">
+            <label class="block font-semibold text-slate-300 uppercase tracking-wider mb-2 text-xs">Eigener Hook (optional)</label>
+            <div class="grid grid-cols-2 gap-2 mb-2">
+              <select id="custom-event" class="bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200">
+                <option>PreToolUse</option>
+                <option>PostToolUse</option>
+                <option>SessionStart</option>
+                <option>UserPromptSubmit</option>
+                <option>Stop</option>
+              </select>
+              <input id="custom-matcher" type="text" class="bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200" placeholder="Matcher, z.B. Bash">
+            </div>
+            <textarea id="custom-command" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 font-mono" placeholder="Shell-Befehl"></textarea>
+          </div>
+          <button onclick="generateHooksJson()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 px-4 rounded-xl text-sm transition">🪝 settings.json generieren</button>
+        </div>
+      </div>
+      <div class="lg:col-span-6 space-y-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl h-full flex flex-col">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-semibold text-slate-200">📄 .claude/settings.json</h3>
+            <div class="flex gap-2">
+              <button onclick="copyElementText('hooks-output')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition">Kopieren</button>
+              <button onclick="downloadText('settings.json', document.getElementById('hooks-output').innerText)" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs px-3 py-1.5 rounded-lg font-medium transition">⬇ Download</button>
+            </div>
+          </div>
+          <pre id="hooks-output" class="flex-1 min-h-[300px] bg-slate-950 border border-slate-800 rounded-xl p-4 text-xs font-mono text-amber-300 whitespace-pre-wrap overflow-y-auto leading-relaxed">Wähle links Hooks aus und klicke "generieren"...</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB: CONTENT GENERATOR ==================== -->
+    <section id="tab-content" class="tab-content hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div class="lg:col-span-4 space-y-4">
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4 text-xs">
+            <h2 class="text-base font-semibold text-slate-100">📢 Content Generator</h2>
+            <p class="text-slate-400">Generiere Social-Posts aus Projekt-Kontext, Repo oder Prompt aus dem Studio.</p>
+
+            <div>
+              <label class="block font-semibold text-slate-300 uppercase tracking-wider mb-1">DeepSeek Key</label>
+              <input type="password" id="content-deepseek-key" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 font-mono" placeholder="sk-...">
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-300 uppercase tracking-wider mb-1">Gemini Key (für Bilder, optional)</label>
+              <input type="password" id="content-gemini-key" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 font-mono" placeholder="AIza...">
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-300 uppercase tracking-wider mb-1">Quelle / Kontext</label>
+              <textarea id="content-source" rows="5" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-200 font-mono" placeholder="Prompt aus Studio, Repo-Beschreibung, Meilenstein..."></textarea>
+              <button onclick="loadContextIntoContent()" class="mt-2 w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 py-1.5 rounded-lg text-[11px]">🧠 Gespeicherten Kontext laden</button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block font-semibold text-slate-300 uppercase tracking-wider mb-1">Zielgruppe</label>
+                <select id="content-audience" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-slate-200">
+                  <option>Entwickler</option>
+                  <option>Unternehmen</option>
+                  <option>Gründer</option>
+                  <option>Privatnutzer</option>
+                </select>
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-300 uppercase tracking-wider mb-1">Ton</label>
+                <select id="content-tone" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-slate-200">
+                  <option>Locker</option>
+                  <option>Professionell</option>
+                  <option>Technisch</option>
+                  <option>Provokant</option>
+                  <option>Sachlich</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-300 uppercase tracking-wider mb-1">Plattformen</label>
+              <div class="flex flex-wrap gap-2 mt-1">
+                <label class="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-full cursor-pointer"><input type="checkbox" class="content-platform" value="x" checked> X · 280</label>
+                <label class="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-full cursor-pointer"><input type="checkbox" class="content-platform" value="bluesky" checked> Bluesky · 300</label>
+                <label class="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-full cursor-pointer"><input type="checkbox" class="content-platform" value="facebook" checked> Facebook · 600</label>
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-300 uppercase tracking-wider mb-1">CTA</label>
+              <select id="content-cta" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-slate-200">
+                <option value="none">Kein CTA</option>
+                <option value="website" selected>Website besuchen</option>
+                <option value="github">GitHub ansehen</option>
+                <option value="try">Projekt ausprobieren</option>
+                <option value="comment">Zum Kommentieren einladen</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-300 uppercase tracking-wider mb-1">Fixe Hashtags</label>
+              <input type="text" id="content-hashtags" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200" placeholder="#KI #OpenSource #ALEX">
+            </div>
+
+            <label class="flex items-center gap-2 p-2 bg-slate-950 border border-slate-800 rounded-lg cursor-pointer">
+              <input type="checkbox" id="content-gen-images" class="rounded border-slate-700 text-indigo-600">
+              <span>Bilder mit Gemini generieren</span>
+            </label>
+
+            <button onclick="generateContentPostsLocal()" class="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-indigo-200 font-medium py-2 px-4 rounded-xl text-sm transition">✍️ Lokal in ALEX-Stimme (ohne KI)</button>
+            <button onclick="generateContentPosts()" id="content-gen-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 px-4 rounded-xl text-sm transition">✨ Posts generieren (KI)</button>
+          </div>
+        </div>
+        <div class="lg:col-span-8 space-y-4">
+          <div id="content-results" class="space-y-4">
+            <div class="bg-slate-900 border border-slate-800 border-dashed rounded-2xl p-12 text-center text-slate-500 text-sm">
+              Noch keine Posts. Kontext/Prompt laden und „Posts generieren“ klicken.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB: PLAN MODE ==================== -->
+    <section id="tab-plan" class="tab-content hidden grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div class="lg:col-span-5 space-y-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+          <h2 class="text-base font-semibold text-slate-100">🗺️ Plan-Modus</h2>
+          <p class="text-xs text-slate-400">Erzeugt einen <strong class="text-slate-200">Arbeitsauftrag</strong> für Claude Code: Ziel, Nicht-Ziele, prüfbare Kriterien, Schritte mit Nachweis, Stopp-Regeln, Berichtsformat. Je genauer deine Angaben, desto brauchbarer das Ergebnis. Die Prüfung rechts zeigt, was noch fehlt.</p>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Material (optional)</label>
+            <div id="plan-drop-zone" class="drop-zone rounded-xl p-4 text-center text-xs text-slate-400 cursor-pointer" onclick="document.getElementById('plan-file-input').click()">
+              <p class="text-sm">📦 ZIP · 📄 HTML · 📝 MD · Code hier ablegen</p>
+              <p class="text-[10px] text-slate-500 mt-1">Daraus wird eine Inventur gezogen (Funktionen, Netzwerkziele, Speicher-Schlüssel, Überschriften). Der Dateiinhalt landet nicht komplett im Auftrag.</p>
+              <input type="file" id="plan-file-input" accept=".zip,.html,.htm,.md,.markdown,.txt,.json,.js,.ts,.tsx,.jsx,.py" multiple class="hidden" onchange="handlePlanFiles(event)">
+            </div>
+            <div id="plan-file-list" class="mt-2 space-y-1 text-[11px] text-slate-400"></div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Art der Aufgabe</label>
+            <select id="plan-goal-type" onchange="runPlanCheck()" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200">
+              <option value="feature">Feature implementieren</option>
+              <option value="github-repo">GitHub-Repo aufbauen / erweitern</option>
+              <option value="refactor">Refactoring / Aufräumen</option>
+              <option value="migrate">Migration / Portierung</option>
+              <option value="docs">Dokumentation / Spec</option>
+              <option value="custom">Benutzerdefiniert</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Ziel</label>
+            <textarea id="plan-goal" rows="3" oninput="runPlanCheck()" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 font-mono" placeholder="Was soll am Ende existieren oder anders sein? z.B. Aus alex-fehler-labor.html eine Einstiegsseite bauen, die mit einem Button „Fehler erfassen“ startet und einen Beispiel-Report zeigt."></textarea>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Akzeptanzkriterien <span class="normal-case text-slate-500 font-normal">(eins pro Zeile, von außen prüfbar)</span></label>
+            <textarea id="plan-criteria" rows="4" oninput="runPlanCheck()" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 font-mono" placeholder="Seite öffnet ohne Konsolenfehler&#10;Beispiel-Report erscheint nach höchstens 3 Klicks&#10;Im Demo-Modus geht kein Netzwerkaufruf raus"></textarea>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Nicht-Ziele <span class="normal-case text-slate-500 font-normal">(eins pro Zeile)</span></label>
+            <textarea id="plan-nongoals" rows="2" oninput="runPlanCheck()" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 font-mono" placeholder="genesis.html nicht ändern&#10;Keine neuen Bibliotheken"></textarea>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Randbedingungen <span class="normal-case text-slate-500 font-normal">(eins pro Zeile)</span></label>
+            <textarea id="plan-constraints" rows="2" oninput="runPlanCheck()" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 font-mono" placeholder="Eine einzelne HTML-Datei&#10;Deutsch, ohne Fachjargon"></textarea>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Prüfbefehl</label>
+              <input id="plan-testcmd" type="text" oninput="runPlanCheck()" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 font-mono" placeholder="z.B. npm test">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Autonomie</label>
+              <select id="plan-autonomy" onchange="runPlanCheck()" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200">
+                <option value="step">Schrittweise (nach jedem Schritt Stopp)</option>
+                <option value="plan">Nur planen (nichts ändern)</option>
+                <option value="auto">Durchlauf (nur bei Stopp-Regel anhalten)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950 border border-slate-800/80 cursor-pointer text-xs">
+              <input type="checkbox" id="plan-use-context" checked class="rounded border-slate-700 text-indigo-600">
+              <span>Gespeicherten Kontext einbeziehen</span>
+            </label>
+            <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950 border border-slate-800/80 cursor-pointer text-xs">
+              <input type="checkbox" id="plan-embed" class="rounded border-slate-700 text-indigo-600">
+              <span>Kurze Dateiauszüge (je 1500 Zeichen) in den Auftrag einbetten</span>
+            </label>
+          </div>
+
+          <div class="flex flex-col sm:flex-row gap-2">
+            <button onclick="generatePlan()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 px-4 rounded-xl text-sm transition">🗺️ Auftrag erzeugen</button>
+            <button onclick="planAskQuestions()" id="plan-q-btn" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-indigo-300 font-medium py-2.5 px-4 rounded-xl text-sm transition">❓ Rückfragen (KI)</button>
+            <button onclick="generatePlanWithAI()" id="plan-ai-btn" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-indigo-300 font-medium py-2.5 px-4 rounded-xl text-sm transition">✨ Mit KI schärfen</button>
+          </div>
+          <p id="plan-privacy" class="text-[10px] text-slate-500 leading-relaxed"></p>
+        </div>
+
+        <div id="plan-qa-box" class="hidden bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
+          <h3 class="text-sm font-semibold text-slate-200">❓ Rückfragen der KI</h3>
+          <p class="text-[11px] text-slate-500">Beantworte, was du kannst. Leere Antworten werden ignoriert. Danach „Auftrag erzeugen“.</p>
+          <div id="plan-qa-list" class="space-y-3"></div>
+        </div>
+      </div>
+
+      <div class="lg:col-span-7 space-y-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-slate-200">🔎 Auftrags-Prüfung</h3>
+            <span id="plan-check-score" class="text-[11px] text-slate-500"></span>
+          </div>
+          <div id="plan-check" class="space-y-1 text-xs text-slate-300"></div>
+          <p class="text-[10px] text-slate-600 mt-2">Heuristik über Wortlisten und Pflichtfelder. Sie findet Lücken, beweist aber nicht, dass ein Kriterium wirklich prüfbar ist.</p>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-semibold text-slate-200">📋 Arbeitsauftrag</h3>
+            <div class="flex gap-2">
+              <button onclick="copyElementText('plan-output')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition">Kopieren</button>
+              <button onclick="downloadText('arbeitsauftrag.md', document.getElementById('plan-output').innerText)" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs px-3 py-1.5 rounded-lg font-medium transition">⬇ Download</button>
+              <button onclick="sendPlanToPrompt()" class="bg-indigo-700 hover:bg-indigo-600 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition">→ Prompt-Tab</button>
+            </div>
+          </div>
+          <p id="plan-status" class="text-[11px] text-slate-500 mb-2"></p>
+          <pre id="plan-output" class="min-h-[400px] bg-slate-950 border border-slate-800 rounded-xl p-4 text-xs font-mono text-sky-300 whitespace-pre-wrap overflow-y-auto leading-relaxed">Trage Ziel und Kriterien ein und klicke „Auftrag erzeugen“...</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB: SESSION ANALYZER ==================== -->
+    <section id="tab-session" class="tab-content hidden grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div class="lg:col-span-5 space-y-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+          <h2 class="text-base font-semibold text-slate-100">🔍 Session-Analyse</h2>
+          <p class="text-xs text-slate-400">Füge den Verlauf einer Claude-/Agenten-Session ein. Die Analyse extrahiert Fehler, vergessene Punkte und Lektionen zum Merken — optional mit KI.</p>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Session-Verlauf einfügen</label>
+            <textarea id="session-log" rows="14" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 font-mono" placeholder="Hier den kompletten Session-Log / Chat-Verlauf einfügen..."></textarea>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Fokus (optional)</label>
+            <input id="session-focus" type="text" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200" placeholder="z.B. Auth-Flow, Performance, Tests...">
+          </div>
+
+          <div class="flex gap-2">
+            <button onclick="analyzeSessionLocal()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 px-4 rounded-xl text-sm transition">🔍 Lokal analysieren</button>
+            <button onclick="analyzeSessionWithAI()" id="session-ai-btn" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-indigo-300 font-medium py-2.5 px-4 rounded-xl text-sm transition">✨ KI-Analyse</button>
+          </div>
+          <button onclick="saveSessionLessonsToContext()" class="w-full bg-emerald-800/80 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded-xl text-sm transition">🧠 Lektionen in Kontext speichern</button>
+        </div>
+      </div>
+      <div class="lg:col-span-7 space-y-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl h-full flex flex-col">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-semibold text-slate-200">📊 Analyse-Ergebnis</h3>
+            <div class="flex gap-2">
+              <button onclick="copyElementText('session-output')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition">Kopieren</button>
+              <button onclick="downloadText('session-analysis.md', document.getElementById('session-output').innerText)" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs px-3 py-1.5 rounded-lg font-medium transition">⬇ Download</button>
+            </div>
+          </div>
+          <pre id="session-output" class="flex-1 min-h-[400px] bg-slate-950 border border-slate-800 rounded-xl p-4 text-xs font-mono text-amber-200 whitespace-pre-wrap overflow-y-auto leading-relaxed">Füge einen Session-Verlauf ein und starte die Analyse...</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB: GENESIS ==================== -->
+    <section id="tab-genesis" class="tab-content hidden space-y-6">
+      <div class="bg-teal-950/30 border border-teal-900/50 rounded-2xl p-5 text-xs text-slate-300 leading-relaxed space-y-2">
+        <h3 class="text-sm font-semibold text-teal-300">📜 Genesis – Entwicklung rekonstruieren</h3>
+        <p>Genesis analysiert Code, Notizen, Chat-Exporte und Git-Historie in fünf Schritten (Material → Zeitleiste → Analyse → Interview → Ergebnis). Neu u.a.: <strong>Operationskarten</strong>, <strong>Behauptungs-Ledger</strong>, <strong>Spannungen</strong>. Hier importierst du die Projektdatei oder das Ergebnis-Markdown und übernimmst die Bausteine in den Kontext — für Prompt, Plan und CLAUDE.md.</p>
+        <p class="text-slate-400">API-Key: Genesis liest denselben DeepSeek-Key aus dem Browser (<code class="text-slate-300">localStorage</code>), den du oben rechts speicherst. Beide Dateien sollten im selben Ordner liegen.</p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div class="lg:col-span-5 space-y-4">
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+            <h2 class="text-base font-semibold text-slate-100">1. Genesis öffnen</h2>
+            <p class="text-xs text-slate-400">Vollständiger 5-Schritt-Wizard in eigenem Fenster. Danach Projekt sichern (JSON) oder Ergebnis als Markdown speichern und hier importieren.</p>
+            <div class="flex flex-wrap gap-2">
+              <a href="genesis.html" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-teal-700 hover:bg-teal-600 text-white font-medium py-2.5 px-4 rounded-xl text-sm transition">↗ Genesis öffnen</a>
+              <button onclick="copyStudioKeyHint()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs px-3 py-2 rounded-xl">Key-Hinweis kopieren</button>
+            </div>
+            <ol class="text-[11px] text-slate-400 list-decimal list-inside space-y-1">
+              <li>In Genesis: Material einlesen → Zeitleiste → Analyse → Interview → Ergebnis</li>
+              <li>„Projekt sichern“ (JSON) oder „Markdown herunterladen“</li>
+              <li>Datei hier unten importieren</li>
+            </ol>
+          </div>
+
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
+            <h2 class="text-base font-semibold text-slate-100">2. Ergebnis importieren</h2>
+            <div id="genesis-drop-zone" class="drop-zone rounded-xl p-5 text-center text-xs text-slate-400 cursor-pointer" onclick="document.getElementById('genesis-file-input').click()">
+              <p class="text-sm">📦 Genesis-Projekt (.json) oder Ergebnis (.md)</p>
+              <p class="text-[10px] text-slate-500 mt-1">Projektdatei aus „Projekt sichern“ oder Markdown aus dem Ergebnis-Tab</p>
+              <input type="file" id="genesis-file-input" accept=".json,.md,.markdown,application/json,text/markdown" class="hidden" onchange="handleGenesisImport(event)">
+            </div>
+            <div id="genesis-import-status" class="text-[11px] text-slate-500"></div>
+          </div>
+
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3" id="genesis-actions" style="display:none">
+            <h2 class="text-base font-semibold text-slate-100">3. In Studio übernehmen</h2>
+            <p class="text-[11px] text-slate-400">Wähle, was in den Projekt-Kontext (und optional andere Tabs) fließen soll.</p>
+            <div class="space-y-2 text-xs">
+              <label class="flex items-center gap-2 p-2 bg-slate-950 border border-slate-800 rounded-lg cursor-pointer"><input type="checkbox" id="gen-imp-patterns" checked class="rounded border-slate-700 text-indigo-600"><span>Muster (Beobachtung, Belege, Risiken)</span></label>
+              <label class="flex items-center gap-2 p-2 bg-slate-950 border border-slate-800 rounded-lg cursor-pointer"><input type="checkbox" id="gen-imp-ops" checked class="rounded border-slate-700 text-indigo-600"><span>Operationskarten (Auslöser, Handgriff, Abbruch…)</span></label>
+              <label class="flex items-center gap-2 p-2 bg-slate-950 border border-slate-800 rounded-lg cursor-pointer"><input type="checkbox" id="gen-imp-claims" checked class="rounded border-slate-700 text-indigo-600"><span>Behauptungs-Ledger</span></label>
+              <label class="flex items-center gap-2 p-2 bg-slate-950 border border-slate-800 rounded-lg cursor-pointer"><input type="checkbox" id="gen-imp-spannungen" checked class="rounded border-slate-700 text-indigo-600"><span>Spannungen zwischen Antworten</span></label>
+              <label class="flex items-center gap-2 p-2 bg-slate-950 border border-slate-800 rounded-lg cursor-pointer"><input type="checkbox" id="gen-imp-whatbin" checked class="rounded border-slate-700 text-indigo-600"><span>„Was bin ich?“ / Verhaltensbeschreibung</span></label>
+              <label class="flex items-center gap-2 p-2 bg-slate-950 border border-slate-800 rounded-lg cursor-pointer"><input type="checkbox" id="gen-imp-gaps" checked class="rounded border-slate-700 text-indigo-600"><span>Lücken &amp; nicht beantwortbar</span></label>
+              <label class="flex items-center gap-2 p-2 bg-slate-950 border border-slate-800 rounded-lg cursor-pointer"><input type="checkbox" id="gen-imp-moments" class="rounded border-slate-700 text-indigo-600"><span>Interview-Momente (Antworten)</span></label>
+              <label class="flex items-center gap-2 p-2 bg-slate-950 border border-slate-800 rounded-lg cursor-pointer"><input type="checkbox" id="gen-imp-fullmd" class="rounded border-slate-700 text-indigo-600"><span>Gesamtes Markdown als einen Kontext-Eintrag</span></label>
+            </div>
+            <button onclick="importGenesisToContext()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 px-4 rounded-xl text-sm transition">🧠 In Kontext speichern</button>
+            <div class="flex gap-2">
+              <button onclick="sendGenesisToSession()" class="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs py-2 rounded-xl">→ Session-Analyse</button>
+              <button onclick="sendGenesisToPlan()" class="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs py-2 rounded-xl">→ Plan-Modus</button>
+            </div>
+            <button onclick="suggestClaudeRulesFromGenesis()" class="w-full bg-amber-800/80 hover:bg-amber-700 text-white text-xs font-medium py-2 rounded-xl">🛡️ Leitplanken aus Mustern vorschlagen</button>
+          </div>
+        </div>
+
+        <div class="lg:col-span-7 space-y-4">
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-semibold text-slate-200">📋 Import-Vorschau</h3>
+              <span id="genesis-preview-meta" class="text-[10px] text-slate-500"></span>
+            </div>
+            <div id="genesis-preview" class="text-xs text-slate-400 space-y-3 max-h-[640px] overflow-y-auto">
+              <p class="text-slate-600 italic">Noch kein Genesis-Ergebnis geladen. Öffne Genesis, sichere ein Projekt oder lade Markdown hier hoch.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB: META / MODEL PROFILES ==================== -->
+    <section id="tab-meta" class="tab-content hidden space-y-6">
+      <div class="bg-indigo-950/30 border border-indigo-900/60 rounded-2xl p-5 text-xs text-slate-300 leading-relaxed space-y-2">
+        <h3 class="text-sm font-semibold text-indigo-300">📍 Scope-Hinweis</h3>
+        <p>Model-Failure-Modes fließen in die Prompt-Härtung ein (Tab Prompt → Ziel-Modell). Echtzeit-Monitoring und Closed-Loop gehören in ALEX OS selbst. Genesis-Muster können über den Tab „Genesis“ in den Kontext fließen.</p>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+        <h2 class="text-base font-semibold text-slate-100">🧬 Model-Failure-Mode-Datenbank</h2>
+        <div id="model-cards" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h3 class="text-sm font-semibold text-slate-200">📌 Meta-OS-Vision als Kontext</h3>
+            <p class="text-xs text-slate-400">Speichert die Vision als festen Kontext-Eintrag.</p>
+          </div>
+          <button onclick="seedVisionContext()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-2 rounded-lg">+ Vision speichern</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- API Key Modal -->
+  <div id="api-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-semibold text-slate-100">⚙️ DeepSeek Konfiguration</h3>
+        <button onclick="toggleApiKeyModal()" class="text-slate-400 hover:text-slate-200">✕</button>
+      </div>
+      <p class="text-xs text-slate-400 leading-relaxed">Deterministische Generatoren funktionieren ohne Key. KI-Funktionen brauchen einen erreichbaren Endpoint.</p>
+      <div>
+        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">API Endpoint</label>
+        <input type="text" id="api-endpoint-input" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 font-mono" placeholder="https://api.deepseek.com/chat/completions">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">DeepSeek API Key</label>
+        <input type="password" id="api-key-input" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 font-mono" placeholder="sk-...">
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="toggleApiKeyModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-4 py-2 rounded-xl">Abbrechen</button>
+        <button onclick="saveApiKey()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-4 py-2 rounded-xl font-medium">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ========== STATE ==========
+    let userApiKey = localStorage.getItem('deepseek_api_key') || '';
+    let userApiEndpoint = localStorage.getItem('deepseek_api_endpoint') || 'https://api.deepseek.com/chat/completions';
+    let contextEntries = [];
+    try { contextEntries = JSON.parse(localStorage.getItem('ccps_context_entries') || '[]'); } catch (e) { contextEntries = []; }
+
+    let planFiles = []; // {name, content, type}
+    let lastSessionAnalysis = '';
+
+    // ========== HOOK TEMPLATES ==========
+    const HOOK_TEMPLATES = [
+      { id: 'security-gate', label: '🚨 Security-Gate: gefährliche Shell-Befehle blocken', event: 'PreToolUse', matcher: 'Bash',
+        command: `echo "$CLAUDE_TOOL_INPUT" | grep -qE 'rm -rf /|curl[^|]*\\|\\s*bash|chmod -R 777|DROP TABLE|:(){ :|:& };:' && exit 2 || exit 0`,
+        desc: 'Blockiert destruktive Kommandos (exit 2 = block).' },
+      { id: 'no-sed-code', label: '🔪 sed auf Code-Dateien blocken', event: 'PreToolUse', matcher: 'Bash',
+        command: `echo "$CLAUDE_TOOL_INPUT" | grep -qE 'sed -i.*\\.(ts|tsx|js|jsx|py|go|rs)' && exit 2 || exit 0`,
+        desc: 'Verhindert riskante Multi-Line-Regex-Edits.' },
+      { id: 'auto-format', label: '🎨 Auto-Format nach Write/Edit', event: 'PostToolUse', matcher: 'Write|Edit|MultiEdit',
+        command: `npx prettier --write "$CLAUDE_TOOL_INPUT_FILE_PATH" 2>/dev/null || true`,
+        desc: 'Formatiert geänderte Dateien.' },
+      { id: 'typecheck-after-write', label: '✅ Type-Check nach Write/Edit', event: 'PostToolUse', matcher: 'Write|Edit|MultiEdit',
+        command: `npx tsc --noEmit 2>&1 | head -20`,
+        desc: 'Sofort-Feedback bei TypeScript-Brüchen.' },
+      { id: 'env-guard', label: '🔒 .env/.git vor Lesen schützen', event: 'PreToolUse', matcher: 'Read',
+        command: `echo "$CLAUDE_TOOL_INPUT" | grep -qE '\\.env($|[^.])|/\\.git/' && exit 2 || exit 0`,
+        desc: 'Blockiert Lesezugriff auf Secrets.' },
+      { id: 'session-context', label: '📌 Git-Branch/Log beim Sessionstart', event: 'SessionStart', matcher: '',
+        command: `echo "{\\"additionalContext\\": \\"Branch: $(git branch --show-current), letzte Commits: $(git log --oneline -5)\\"}"`,
+        desc: 'Frischt Kontext bei Sessionstart auf.' }
+    ];
+
+    const MODEL_FAILURE_MODES = {
+      'claude-code': {
+        label: 'Claude Code',
+        modes: ['context_rot (>20% Context)', 'scope_creep_overengineering', 'security_blind_spots'],
+        countermeasures: [
+          'Bei langen Sessions: aktiv nach Zusammenfassung fragen.',
+          'Scope strikt auf die gestellte Aufgabe begrenzen.',
+          'Sicherheitsrelevante Stellen explizit gegenprüfen.'
+        ]
+      },
+      'devin': {
+        label: 'Devin',
+        modes: ['infinite_loop', 'bad_recovery_ambiguity', 'high_multi_step_costs'],
+        countermeasures: [
+          'Klares Abbruchkriterium: nach N Versuchen stoppen.',
+          'Bei Mehrdeutigkeit: nachfragen statt raten.',
+          'Multi-Step-Pläne vorher grob abschätzen lassen.'
+        ]
+      },
+      'cursor': {
+        label: 'Cursor',
+        modes: ['context_confusion', 'code_reversion_crash', 'looping_on_failure'],
+        countermeasures: [
+          'Vor größeren Änderungen Datei-Kontext bestätigen lassen.',
+          'Prüfen, ob vorherige Fixes rückgängig gemacht wurden.',
+          'Bei Wiederholung: Strategie wechseln.'
+        ]
+      },
+      'openhands': {
+        label: 'OpenHands',
+        modes: ['excessive_agency_risk', 'uncontrolled_package_install'],
+        countermeasures: [
+          'Keine Systempakete ohne Zustimmung installieren.',
+          'Handlungsspielraum eng an die Aufgabe binden.'
+        ]
+      }
+    };
+
+    const VISION_SEED_TEXT = `# ALEX Meta-OS Vision (Stand Juli 2026)
+
+ALEX ist die Steuerungs- und Lernschicht über der Interaktion zwischen Mensch und KI.
+
+## Architektur-Ebenen
+1. Session Engine (Operativ)
+2. Collaboration Intelligence
+3. User Digital Twin
+4. Model Intelligence
+5. Project Intelligence
+6. Evolution Engine
+
+## Sicherheits-Framework
+- DLP-Proxy für Secrets
+- Vertrauensregel: keine Behauptung ohne Live-Verifikation
+- Human-in-the-Loop bei Regeländerungen`;
+
+    // ========== INIT ==========
+    window.onload = function () {
+      updateApiKeyStatusDisplay();
+      renderContextList();
+      renderHookCheckboxes();
+      renderModelCards();
+      setupDropZones();
+      // Sync content keys from main
+      if (userApiKey) document.getElementById('content-deepseek-key').value = userApiKey;
+    };
+
+    function setupDropZones() {
+      ['md-drop-zone', 'plan-drop-zone', 'genesis-drop-zone'].forEach(id => {
+        const zone = document.getElementById(id);
+        if (!zone) return;
+        zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+        zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+        zone.addEventListener('drop', e => {
+          e.preventDefault();
+          zone.classList.remove('dragover');
+          if (id === 'md-drop-zone' && e.dataTransfer.files[0]) {
+            handleMdFile(e.dataTransfer.files[0]);
+          } else if (id === 'plan-drop-zone') {
+            handlePlanFileList(e.dataTransfer.files);
+          } else if (id === 'genesis-drop-zone' && e.dataTransfer.files[0]) {
+            processGenesisFile(e.dataTransfer.files[0]);
+          }
+        });
+      });
+    }
+
+    // ========== UTILITIES ==========
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      document.getElementById('toast-message').innerText = msg || 'Erledigt!';
+      t.classList.remove('translate-y-[-100px]', 'opacity-0', 'pointer-events-none');
+      t.classList.add('translate-y-0', 'opacity-100');
+      setTimeout(() => {
+        t.classList.remove('translate-y-0', 'opacity-100');
+        t.classList.add('translate-y-[-100px]', 'opacity-0', 'pointer-events-none');
+      }, 2500);
+    }
+
+    function copyDirectText(text) {
+      if (!text) return;
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.top = '0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      try { document.execCommand('copy'); showToast('Kopiert!'); } catch (e) { console.error(e); }
+      document.body.removeChild(ta);
+    }
+    function copyElementText(id) {
+      const el = document.getElementById(id);
+      if (el) copyDirectText(el.innerText || el.textContent);
+    }
+    function downloadText(filename, content) {
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast(`${filename} heruntergeladen`);
+    }
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('tab-active');
+        btn.classList.add('text-slate-400');
+      });
+      document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+      const btn = document.getElementById(`tab-btn-${tabId}`);
+      btn.classList.add('tab-active');
+      btn.classList.remove('text-slate-400');
+      if (tabId === 'plan') { updatePlanPrivacyNote(); runPlanCheck(); }
+    }
+    function escapeHtml(str) {
+      return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // ========== API KEY ==========
+    function toggleApiKeyModal() {
+      const modal = document.getElementById('api-modal');
+      modal.classList.toggle('hidden');
+      if (!modal.classList.contains('hidden')) {
+        document.getElementById('api-key-input').value = userApiKey;
+        document.getElementById('api-endpoint-input').value = userApiEndpoint;
+      }
+    }
+    function saveApiKey() {
+      userApiKey = document.getElementById('api-key-input').value.trim();
+      userApiEndpoint = document.getElementById('api-endpoint-input').value.trim() || 'https://api.deepseek.com/chat/completions';
+      localStorage.setItem('deepseek_api_key', userApiKey);
+      localStorage.setItem('deepseek_api_endpoint', userApiEndpoint);
+      updateApiKeyStatusDisplay();
+      if (userApiKey) document.getElementById('content-deepseek-key').value = userApiKey;
+      toggleApiKeyModal();
+      showToast('Gespeichert!');
+    }
+    function updateApiKeyStatusDisplay() {
+      const el = document.getElementById('api-key-status');
+      el.innerText = userApiKey ? 'DeepSeek: Key Aktiv ⚡' : 'DeepSeek: Standard';
+      el.classList.toggle('text-emerald-400', !!userApiKey);
+    }
+
+    // ========== CONTEXT ==========
+    function persistContext() {
+      localStorage.setItem('ccps_context_entries', JSON.stringify(contextEntries));
+    }
+
+    function addContextEntry(labelOverride, textOverride) {
+      const label = labelOverride || document.getElementById('ctx-label').value.trim() || 'Ohne Titel';
+      const text = textOverride || document.getElementById('ctx-text').value.trim();
+      if (!text) { alert('Bitte Text eingeben.'); return; }
+      contextEntries.unshift({ id: Date.now(), ts: new Date().toISOString(), label, text });
+      persistContext();
+      if (!labelOverride) {
+        document.getElementById('ctx-label').value = '';
+        document.getElementById('ctx-text').value = '';
+      }
+      renderContextList();
+      showToast('Zum Kontext hinzugefügt');
+    }
+
+    function deleteContextEntry(id) {
+      contextEntries = contextEntries.filter(e => e.id !== id);
+      persistContext();
+      renderContextList();
+    }
+
+    function clearAllContext() {
+      if (!confirm('Wirklich den kompletten gespeicherten Kontext löschen?')) return;
+      contextEntries = [];
+      persistContext();
+      renderContextList();
+    }
+
+    function renderContextList() {
+      const list = document.getElementById('context-list');
+      document.getElementById('context-count').innerText = contextEntries.length;
+      document.getElementById('context-count-inline').innerText = contextEntries.length;
+      if (contextEntries.length === 0) {
+        list.innerHTML = `<p class="text-xs text-slate-600 italic p-3">Noch keine Einträge.</p>`;
+        return;
+      }
+      list.innerHTML = contextEntries.map(e => `
+        <div class="bg-slate-950 border border-slate-800 rounded-lg p-3">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs font-semibold text-indigo-300">${escapeHtml(e.label)}</span>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] text-slate-500">${new Date(e.ts).toLocaleString('de-DE')}</span>
+              <button onclick="deleteContextEntry(${e.id})" class="text-[10px] text-rose-400 hover:text-rose-300">löschen</button>
+            </div>
+          </div>
+          <p class="text-[11px] text-slate-400 whitespace-pre-wrap font-mono">${escapeHtml(e.text.slice(0, 400))}${e.text.length > 400 ? '…' : ''}</p>
+        </div>`).join('');
+    }
+
+    function getContextExcerpt(maxChars) {
+      maxChars = maxChars || 6000;
+      let out = '';
+      for (const e of contextEntries) {
+        const block = `### ${e.label} (${new Date(e.ts).toLocaleDateString('de-DE')})\n${e.text}\n\n`;
+        if (out.length + block.length > maxChars) break;
+        out += block;
+      }
+      return out.trim();
+    }
+
+    function exportContext() {
+      downloadText('claude-context.json', JSON.stringify(contextEntries, null, 2));
+    }
+
+    function importContext(evt) {
+      const file = evt.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const imported = JSON.parse(e.target.result);
+          if (!Array.isArray(imported)) throw new Error('Keine Liste');
+          const existingIds = new Set(contextEntries.map(x => x.id));
+          const merged = contextEntries.concat(imported.filter(x => !existingIds.has(x.id)));
+          merged.sort((a, b) => b.ts.localeCompare(a.ts));
+          contextEntries = merged;
+          persistContext();
+          renderContextList();
+          showToast(`${imported.length} Einträge importiert`);
+        } catch (err) {
+          alert('Import fehlgeschlagen: kein gültiges Kontext-JSON.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // MD Upload for Context
+    function handleMdUpload(evt) {
+      const file = evt.target.files[0];
+      if (file) handleMdFile(file);
+    }
+    function handleMdFile(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target.result;
+        const label = file.name.replace(/\.(md|markdown|txt)$/i, '');
+        addContextEntry(label + ' (MD-Upload)', text);
+        showToast(`MD "${file.name}" als Kontext gespeichert`);
+      };
+      reader.readAsText(file);
+    }
+
+    function generatePromptFromContext() {
+      if (contextEntries.length === 0) {
+        alert('Kein Kontext vorhanden. Lade zuerst MD-Dateien oder füge Einträge hinzu.');
+        return;
+      }
+      const excerpt = getContextExcerpt(8000);
+      const prompt = `[AUFGABE AUS KONTEXT / BAUANLEITUNG]
+Erstelle auf Basis des folgenden Projekt-Kontexts / der Bauanleitung einen konkreten, umsetzbaren Plan und die notwendigen Code-Änderungen.
+
+[PROJEKT-KONTEXT]
+${excerpt}
+
+[SICHERHEITS-LEITPLANKEN]
+${buildGuardrails()}
+
+[ERWARTETES ERGEBNIS]
+Strukturiere die Umsetzung in klare Schritte. Ändere nur das Nötigste. Zeige am Ende die geänderten Dateien und einen Testlauf.`;
+      document.getElementById('prompt-output').innerText = prompt;
+      switchTab('prompt');
+      showToast('Prompt aus Kontext generiert');
+    }
+
+    // ========== PROMPT GENERATION ==========
+    function buildGuardrails() {
+      const map = [
+        ['g-plan', '- ZUERST PLANEN: Erstelle vor jeglicher Code-Änderung einen kurzen 3-Schritt-Plan. Verändere vorher keine Dateien.'],
+        ['g-test', '- KEINE TEST-MANIPULATION: Verändere niemals fehlerhafte Tests/Mocks, um grüne Builds zu erzwingen.'],
+        ['g-files', '- DATEI-LIMIT: Passe maximal 2-3 eng zusammenhängende Dateien an.'],
+        ['g-refactor', '- KEIN UNGEFRAGTES REFACTORING: Keine Umbenennungen außerhalb der Fehlerstelle.'],
+        ['g-git', '- GIT-CHECKPOINT: Bestätige vorher, dass der aktuelle Stand committet ist.'],
+        ['g-exit', '- EXIT-CODE PRÜFUNG: Werte bei CLI-Befehlen stderr und Exit-Codes aus.'],
+        ['g-demo', '- KEIN DEMO-THEATER: Keine hartkodierten Werte oder Fake-Daten als fertige Funktion ausgeben.'],
+        ['g-sed', '- KEIN SED AUF CODE: Keine Multi-Line-Edits per sed/Regex. Nur atomare Patches.'],
+        ['g-verify', '- VERTRAUENSREGEL: Keine Behauptung über eigene Fähigkeiten/Ergebnisse ohne Live-Verifikation.']
+      ];
+      return map.filter(([id]) => document.getElementById(id)?.checked).map(([, text]) => text).join('\n');
+    }
+
+    function generatePrompt() {
+      const task = document.getElementById('task-input').value.trim();
+      if (!task) { alert('Bitte zuerst beschreiben, was du bauen/ändern willst.'); return; }
+      const useCtx = document.getElementById('use-context').checked;
+      let prompt = `[AUFGABE]\n${task}\n\n`;
+      if (useCtx && contextEntries.length > 0) {
+        const excerpt = getContextExcerpt(4000);
+        if (excerpt) prompt += `[PROJEKT-KONTEXT]\n${excerpt}\n\n`;
+      }
+      prompt += `[SICHERHEITS-LEITPLANKEN]\n${buildGuardrails()}\n\n`;
+      const modelKey = document.getElementById('target-model').value;
+      if (modelKey && MODEL_FAILURE_MODES[modelKey]) {
+        const m = MODEL_FAILURE_MODES[modelKey];
+        prompt += `[MODELL-SPEZIFISCHE GEGENMASSNAHMEN – ${m.label}]\nBekannte Schwachstellen: ${m.modes.join(', ')}.\n${m.countermeasures.map(c => '- ' + c).join('\n')}\n\n`;
+      }
+      prompt += `[ERWARTETES ERGEBNIS]\nBehebe/baue das präzise. Bestätige am Ende die geänderten Dateien, zeig ein kompaktes 'git diff' und führe einen Testlauf durch.`;
+      document.getElementById('prompt-output').innerText = prompt;
+    }
+
+    async function enhancePromptWithAI() {
+      const task = document.getElementById('task-input').value.trim();
+      if (!task) { alert('Bitte zuerst beschreiben, was du bauen/ändern willst.'); return; }
+      if (!userApiKey) { alert('Kein DeepSeek API Key hinterlegt (oben rechts).'); return; }
+
+      const btn = document.getElementById('ai-enhance-btn');
+      const original = btn.innerHTML;
+      btn.innerHTML = '⏳ ...'; btn.disabled = true;
+
+      const useCtx = document.getElementById('use-context').checked;
+      const ctxExcerpt = useCtx ? getContextExcerpt(6000) : '';
+
+      const systemPrompt = `Du bist ein Weltklasse-Experte für Claude Code Agenten. Transformiere die Anforderung des Nutzers in einen glasklaren, gehärteten Prompt für ein CLI-Agenten-Tool. Berücksichtige den mitgelieferten Projekt-Kontext. Berücksichtige bekannte Claude-Code-Schwachstellen: Test-/Mock-Manipulation, ungefragtes Refactoring, Demo-Theater, riskante sed-Edits. Gib ausschließlich den finalen Prompt auf Deutsch zurück, ohne Präambel.`;
+      const userContent = ctxExcerpt ? `[PROJEKT-KONTEXT]\n${ctxExcerpt}\n\n[AUFGABE]\n${task}` : task;
+
+      try {
+        const response = await fetch(userApiEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${userApiKey}` },
+          body: JSON.stringify({
+            model: 'deepseek-chat',
+            messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userContent }],
+            temperature: 0.4
+          })
+        });
+        if (!response.ok) throw new Error(`${response.status}`);
+        const data = await response.json();
+        const text = data?.choices?.[0]?.message?.content;
+        if (text) {
+          document.getElementById('prompt-output').innerText = text.trim();
+          showToast('Mit DeepSeek optimiert!');
+        } else throw new Error('Keine Antwort');
+      } catch (err) {
+        alert('DeepSeek-Fehler (evtl. CORS): ' + err.message + '. Deterministischer Generator funktioniert weiter.');
+        generatePrompt();
+      } finally {
+        btn.innerHTML = original; btn.disabled = false;
+      }
+    }
+
+    function sendPromptToContent() {
+      const text = document.getElementById('prompt-output').innerText;
+      if (!text || text.includes('Klicke "Prompt generieren"')) {
+        alert('Zuerst einen Prompt generieren.');
+        return;
+      }
+      document.getElementById('content-source').value = text.slice(0, 3000);
+      switchTab('content');
+      showToast('Prompt in Content-Generator geladen');
+    }
+
+    // ========== CLAUDE.MD ==========
+    function handleClaudeMdUpload(evt) {
+      const file = evt.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        document.getElementById('claude-md-raw').value = e.target.result;
+        document.getElementById('claude-md-output').innerText = e.target.result;
+        showToast('CLAUDE.md geladen');
+      };
+      reader.readAsText(file);
+    }
+
+    function loadClaudeMdIntoGenerator() {
+      const raw = document.getElementById('claude-md-raw').value.trim();
+      if (!raw) { alert('Keine CLAUDE.md geladen.'); return; }
+      document.getElementById('claude-md-output').innerText = raw;
+      showToast('In Vorschau geladen');
+    }
+
+    function cleanClaudeMd() {
+      let raw = document.getElementById('claude-md-raw').value.trim() || document.getElementById('claude-md-output').innerText;
+      if (!raw || raw.includes('Klicke "CLAUDE.md generieren"')) {
+        alert('Bitte zuerst eine CLAUDE.md hochladen oder generieren.');
+        return;
+      }
+
+      // Deterministic cleanup
+      let cleaned = raw
+        // Remove excessive blank lines
+        .replace(/\n{3,}/g, '\n\n')
+        // Strengthen common weak phrasing
+        .replace(/sollte(?:st)?\s+/gi, 'muss ')
+        .replace(/kann(?:st)?\s+optional/gi, 'nur nach Bestätigung')
+        .replace(/wenn möglich/gi, 'nur wenn explizit gefordert')
+        // Ensure key rules exist
+        ;
+
+      const mustHave = [
+        { key: 'Niemals Tests manipulieren', line: '- 🚫 **Niemals Tests manipulieren**: Fehlschlagende Tests zeigen echte Bugs. Nie Assertions/Mocks ändern.' },
+        { key: 'Exit-Code', line: '- 🔍 **Exit-Code-Pflicht**: Bei CLI-Befehlen stderr und Exit-Codes auswerten.' },
+        { key: 'Demo-Theater', line: '- 🎭 **Kein Demo-Theater**: Keine Fake-Daten als fertiges Feature ausgeben.' },
+        { key: 'Vertrauensregel', line: '- 🔎 **Vertrauensregel**: Keine Behauptung ohne Live-Verifikation (API-Call/DB-Query).' },
+        { key: 'sed', line: '- 🔪 **Kein sed auf Code**: Nur atomare, dateibasierte Patches.' }
+      ];
+
+      let rulesSection = '';
+      mustHave.forEach(r => {
+        if (!cleaned.toLowerCase().includes(r.key.toLowerCase().slice(0, 12))) {
+          rulesSection += r.line + '\n';
+        }
+      });
+
+      if (rulesSection) {
+        if (cleaned.includes('## 2.') || cleaned.includes('## Regeln') || cleaned.includes('## Strikte')) {
+          cleaned = cleaned.replace(/(## 2\.[^\n]*\n|## Regeln[^\n]*\n|## Strikte[^\n]*\n)/, `$1${rulesSection}`);
+        } else {
+          cleaned += `\n\n## Ergänzte harte Regeln (Auto-Säuberung)\n${rulesSection}`;
+        }
+      }
+
+      cleaned = `# CLAUDE.md – gehärtet / gesäubert\n\n` + cleaned.replace(/^#\s*CLAUDE\.md[^\n]*\n*/i, '');
+      document.getElementById('claude-md-output').innerText = cleaned;
+      document.getElementById('claude-md-raw').value = cleaned;
+      showToast('CLAUDE.md gesäubert & gehärtet');
+    }
+
+    function generateClaudeMd() {
+      const stack = document.getElementById('cmd-stack').value.trim();
+      const testCmd = document.getElementById('cmd-test').value.trim();
+      let content = `# CLAUDE.md - Projekt-Leitplanken\n\n## 1. Tech Stack & Kontext\n- Stack: ${stack}\n- Test/Build: \`${testCmd}\`\n\n## 2. Strikte Agenten-Regeln\n`;
+      const rules = [
+        ['r-test', '- 🚫 **Niemals Tests manipulieren**: Fehlschlagende Tests zeigen echte Bugs. Nie Assertions/Mocks ändern.'],
+        ['r-exit', '- 🔍 **Exit-Code-Pflicht**: Bei CLI-Befehlen stderr und Exit-Codes auswerten.'],
+        ['r-secrets', '- 🔒 **Datenschutz**: Keine .env-Dateien, API-Keys oder Zugangsdaten lesen/loggen.'],
+        ['r-demo', '- 🎭 **Kein Demo-Theater**: Keine Fake-Daten als fertiges Feature ausgeben.'],
+        ['r-sed', '- 🔪 **Kein sed auf Code**: Nur atomare, dateibasierte Patches.'],
+        ['r-atomic', '- 🎯 **Minimale Diffs**: Kein ungefragtes Refactoring.'],
+        ['r-verify', '- 🔎 **Vertrauensregel**: Keine Behauptung ohne Live-Verifikation.'],
+        ['r-hitl', '- 🧑‍⚖️ **Human-in-the-Loop**: Diese CLAUDE.md nicht automatisch ändern bei hoher Komplexität.']
+      ];
+      rules.forEach(([id, text]) => { if (document.getElementById(id)?.checked) content += text + '\n'; });
+      content += `\n## 3. Workflow-Disziplin\n1. Bei unklaren Anforderungen kurz nachfragen.\n2. Vor größeren Refactorings: Spec + Bestätigung.\n3. Nach jeder Aufgabe: Tests/Build ausführen, git diff zeigen.\n`;
+
+      if (document.getElementById('r-context')?.checked && contextEntries.length > 0) {
+        content += `\n## 4. Bekannter Projekt-Kontext\n\n${getContextExcerpt(5000)}\n`;
+      }
+      document.getElementById('claude-md-output').innerText = content;
+    }
+
+    // ========== HOOKS ==========
+    function renderHookCheckboxes() {
+      const container = document.getElementById('hook-checkboxes');
+      container.innerHTML = HOOK_TEMPLATES.map(h => `
+        <label class="flex items-start gap-2.5 p-2.5 rounded-lg bg-slate-950 border border-slate-800/80 cursor-pointer">
+          <input type="checkbox" id="hook-${h.id}" checked class="mt-0.5 rounded border-slate-700 text-indigo-600">
+          <span>
+            <span class="block font-medium text-slate-200">${h.label}</span>
+            <span class="block text-[11px] text-slate-500">${h.desc}</span>
+          </span>
+        </label>`).join('');
+    }
+
+    function generateHooksJson() {
+      const settings = { hooks: {} };
+      const addHook = (event, matcher, command) => {
+        if (!settings.hooks[event]) settings.hooks[event] = [];
+        let bucket = settings.hooks[event].find(b => b.matcher === matcher);
+        if (!bucket) { bucket = { matcher: matcher || '', hooks: [] }; settings.hooks[event].push(bucket); }
+        bucket.hooks.push({ type: 'command', command });
+      };
+
+      HOOK_TEMPLATES.forEach(h => {
+        if (document.getElementById(`hook-${h.id}`)?.checked) addHook(h.event, h.matcher, h.command);
+      });
+
+      const customCmd = document.getElementById('custom-command').value.trim();
+      if (customCmd) {
+        const event = document.getElementById('custom-event').value;
+        const matcher = document.getElementById('custom-matcher').value.trim();
+        addHook(event, matcher, customCmd);
+      }
+
+      document.getElementById('hooks-output').innerText = JSON.stringify(settings, null, 2);
+      showToast('settings.json generiert');
+    }
+
+    // ========== PLAN MODE ==========
+    const PLAN_FENCE = '`'.repeat(3);
+    const PLAN_MAX_CHARS = 300000;
+    let planQA = []; // {q, a}
+
+    const PLAN_REQUIRED_HEADINGS = [
+      '## Rolle', '## Ziel', '## Nicht-Ziele', '## Ausgangslage', '## Randbedingungen',
+      '## Vorgehen', '## Akzeptanzkriterien', '## Stopp- und Rückfrageregeln', '## Berichtsformat', '## Offene Fragen'
+    ];
+
+    const PLAN_PROFILES = {
+      'feature': {
+        label: 'Feature implementieren',
+        role: 'Du bist ein sorgfältiger Entwickler. Du baust genau das beschriebene Feature und fasst nichts an, was nicht dazugehört.',
+        pre: [
+          { t: 'Prüfschritt vor der Umsetzung', a: 'Formuliere für das Feature mindestens einen Test oder einen manuellen Prüfschritt, der vor der Umsetzung fehlschlägt.', v: 'Zeige den fehlschlagenden Lauf bzw. die Beobachtung.' }
+        ],
+        post: [],
+        rules: ['Bestehendes Verhalten außerhalb des Features bleibt unverändert.']
+      },
+      'github-repo': {
+        label: 'GitHub-Repo aufbauen / erweitern',
+        role: 'Du bist Senior-Entwickler und bringst ein bestehendes Projekt in ein sauberes, reproduzierbares Repository.',
+        pre: [
+          { t: 'Repo-Grundlage prüfen', a: 'Prüfe, ob Git-Repo, .gitignore, README und Lizenz existieren. Nur berichten, nichts anlegen.', v: 'Zeige die Ausgabe von git status und die Dateiliste des Projekts.' }
+        ],
+        post: [
+          { t: 'Repo-Hygiene', a: 'Lege .gitignore, README und CLAUDE.md an bzw. ergänze sie. Die Start-Anleitung in der README führst du selbst einmal komplett aus. Suche das Repo nach Secrets und API-Keys ab und entferne sie aus dem Code.', v: 'Zeige den Such-Befehl nach Secrets samt Ergebnis und den Lauf der README-Anleitung.' }
+        ],
+        rules: ['Keine Secrets, API-Keys oder .env-Dateien committen.', 'Ein Commit pro Schritt mit aussagekräftiger Nachricht.']
+      },
+      'refactor': {
+        label: 'Refactoring / Aufräumen',
+        role: 'Du bist ein vorsichtiger Refactoring-Spezialist. Du veränderst Struktur, niemals Verhalten.',
+        pre: [
+          { t: 'Sicherheitsnetz herstellen', a: 'Führe die vorhandenen Tests bzw. den Prüfbefehl aus und halte das Ergebnis als Referenz fest. Gibt es keine Tests, schreibe zuerst Charakterisierungstests oder stoppe und frage.', v: 'Zeige den Referenzlauf mit Ergebnis.' }
+        ],
+        post: [],
+        rules: ['Kein Verhalten ändern, nur Struktur.', 'Keine Umbenennung öffentlicher Schnittstellen ohne meine Freigabe.']
+      },
+      'migrate': {
+        label: 'Migration / Portierung',
+        role: 'Du bist ein Migrations-Ingenieur. Das alte System bleibt lauffähig, bis die Gleichwertigkeit nachgewiesen ist.',
+        pre: [
+          { t: 'Ist-Verhalten festhalten', a: 'Dokumentiere das aktuelle Verhalten (Eingaben, Ausgaben, Randfälle) als Vergleichsbasis in einer Datei.', v: 'Die Vergleichsbasis liegt als Datei vor und du zeigst ihren Inhalt.' }
+        ],
+        post: [
+          { t: 'Vorher/Nachher-Vergleich', a: 'Führe dieselben Fälle auf dem neuen Stand aus und vergleiche sie mit der Basis. Jede Abweichung einzeln auflisten.', v: 'Vergleichstabelle mit tatsächlichen Ergebnissen.' }
+        ],
+        rules: ['Das alte System wird nicht gelöscht oder verändert, bevor der Vergleich bestanden ist.']
+      },
+      'docs': {
+        label: 'Dokumentation / Spec',
+        role: 'Du bist ein technischer Redakteur. Du beschreibst nur, was im Code nachweisbar ist.',
+        pre: [],
+        post: [
+          { t: 'Belege prüfen', a: 'Gleiche jede technische Aussage der Doku mit dem Code ab. Nicht belegbare Aussagen streichen oder als „unbestätigt“ markieren.', v: 'Liste der geprüften, gestrichenen und als unbestätigt markierten Aussagen.' }
+        ],
+        rules: ['Keine Funktion beschreiben, die im Code nicht nachweisbar existiert.']
+      },
+      'custom': {
+        label: 'Benutzerdefinierte Aufgabe',
+        role: 'Du bist ein sorgfältiger Coding-Agent. Du arbeitest nur am beschriebenen Ziel.',
+        pre: [], post: [], rules: []
+      }
+    };
+
+    const PLAN_VAGUE_STEMS = ['schön', 'besser', 'modern', 'optimier', 'verbesser', 'irgendwie', 'sauber', 'professionell', 'intuitiv', 'benutzerfreundlich', 'ordentlich', 'robust', 'skalierbar', 'performant', 'usw'];
+    const PLAN_OBSERVABLE = /(läuft|laufen|zeigt|zeigen|erzeugt|liefert|gibt .* aus|exit|test|grün|ohne fehler|fehlerfrei|existiert|enthält|mindestens|höchstens|genau|\d|status|antwortet|lädt|speichert|exportiert|angezeigt|sichtbar|schlägt fehl|abgelehnt|blockiert|kein[e]? |nicht |öffnet|erscheint)/i;
+
+    function planVal(id) { return (document.getElementById(id)?.value || '').trim(); }
+    function planLines(id) {
+      return planVal(id).split('\n').map(s => s.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim()).filter(Boolean);
+    }
+
+    function readPlanFields() {
+      return {
+        type: planVal('plan-goal-type') || 'feature',
+        goal: planVal('plan-goal'),
+        criteria: planLines('plan-criteria'),
+        nongoals: planLines('plan-nongoals'),
+        constraints: planLines('plan-constraints'),
+        testcmd: planVal('plan-testcmd'),
+        autonomy: planVal('plan-autonomy') || 'step',
+        embed: !!document.getElementById('plan-embed')?.checked,
+        useCtx: !!document.getElementById('plan-use-context')?.checked
+      };
+    }
+
+    // ---------- Datei-Inventur (Regex, keine Vollanalyse) ----------
+    function planInventory(f) {
+      if (f.inv) return f.inv;
+      const c = f.content || '';
+      const ext = (f.name.split('.').pop() || '').toLowerCase();
+      const uniq = (arr, n) => [...new Set(arr)].slice(0, n);
+      const facts = [];
+      const add = (label, arr, total) => {
+        if (!arr.length) return;
+        facts.push(`${label}${total && total > arr.length ? ` (${total} gesamt, erste ${arr.length})` : ''}: ${arr.join(', ')}`);
+      };
+      const funcs = [...c.matchAll(/function\s+([A-Za-z_$][\w$]*)\s*\(/g)].map(m => m[1]);
+      const fetchCount = (c.match(/fetch\(/g) || []).length;
+
+      if (ext === 'html' || ext === 'htm') {
+        const title = (c.match(/<title[^>]*>([^<]*)<\/title>/i) || [])[1];
+        if (title) facts.push(`Titel: ${title.trim().replace(/&amp;/g, '&')}`);
+        add('Externe Skript-Hosts', uniq([...c.matchAll(/<script[^>]+src=["'](https?:[^"']+)["']/gi)].map(m => m[1].replace(/^https?:\/\//, '').split('/')[0]), 8));
+        if (fetchCount) {
+          facts.push(`fetch-Aufrufe: ${fetchCount}`);
+          add('Fest eingetragene fetch-Hosts', uniq([...c.matchAll(/fetch\(\s*[`'"](https?:[^`'"$]+)/gi)].map(m => m[1].replace(/^https?:\/\//, '').split('/')[0]), 8));
+        }
+        add('localStorage-Schlüssel', uniq([...c.matchAll(/localStorage\.(?:getItem|setItem|removeItem)\(\s*['"`]([^'"`]+)['"`]/g)].map(m => m[1]), 12));
+        add('Funktionen', uniq(funcs, 15), new Set(funcs).size);
+      } else if (ext === 'md' || ext === 'markdown') {
+        const heads = [...c.matchAll(/^#{1,3}\s+(.+)$/gm)].map(m => m[1].trim());
+        add('Überschriften', uniq(heads, 10), new Set(heads).size);
+      } else if (ext === 'json') {
+        try {
+          const j = JSON.parse(c);
+          if (j && typeof j === 'object' && !Array.isArray(j)) {
+            add('Oberste Schlüssel', Object.keys(j).slice(0, 15));
+            if (j.scripts) add('npm-Skripte', Object.keys(j.scripts).slice(0, 12));
+            if (j.dependencies) add('Abhängigkeiten', Object.keys(j.dependencies).slice(0, 15));
+          } else if (Array.isArray(j)) {
+            facts.push(`JSON-Liste mit ${j.length} Einträgen`);
+          }
+        } catch (e) { facts.push('JSON nicht lesbar (Syntaxfehler oder abgeschnitten)'); }
+      } else if (['js', 'ts', 'tsx', 'jsx', 'py'].includes(ext)) {
+        const defs = ext === 'py'
+          ? [...c.matchAll(/^\s*(?:async\s+)?(?:def|class)\s+([A-Za-z_]\w*)/gm)].map(m => m[1])
+          : [...c.matchAll(/(?:function\s+|class\s+)([A-Za-z_$][\w$]*)/g)].map(m => m[1]);
+        add('Funktionen/Klassen', uniq(defs, 15), new Set(defs).size);
+        const imps = ext === 'py'
+          ? [...c.matchAll(/^\s*(?:from|import)\s+([\w.]+)/gm)].map(m => m[1])
+          : [...c.matchAll(/(?:from\s+|require\()\s*['"]([^'"]+)['"]/g)].map(m => m[1]);
+        add('Imports', uniq(imps, 12));
+        if (fetchCount || /requests\.(get|post)|urllib|httpx/.test(c)) facts.push('Enthält Netzwerkaufrufe');
+      } else {
+        const first = c.split('\n').find(l => l.trim());
+        if (first) facts.push(`Erste Zeile: ${first.trim().slice(0, 100)}`);
+      }
+      if (f.truncated) facts.push(`ACHTUNG: Datei war größer als ${PLAN_MAX_CHARS} Zeichen und wurde abgeschnitten, Inventur unvollständig`);
+      f.inv = { lines: c.split('\n').length, chars: c.length, facts };
+      return f.inv;
+    }
+
+    // ---------- Prüfung ----------
+    function planWeakCriteria(criteria) {
+      return criteria.map((c, i) => i).filter(i => criteria[i].split(/\s+/).length < 4 || !PLAN_OBSERVABLE.test(criteria[i]));
+    }
+
+    function evaluatePlan() {
+      const f = readPlanFields();
+      const items = [];
+      const push = (level, text, open) => items.push({ level, text, open: open || '' });
+
+      if (!f.goal) push('bad', 'Ziel fehlt.', 'Das Ziel wurde nicht angegeben. Kläre es mit mir, bevor du etwas änderst.');
+      else if (f.goal.split(/\s+/).length < 8) push('warn', `Ziel sehr knapp (${f.goal.split(/\s+/).length} Wörter). Was genau soll am Ende anders sein?`, 'Das Ziel ist knapp formuliert. Frage nach, wenn etwas unklar bleibt.');
+      else push('ok', 'Ziel ist ausformuliert.');
+
+      if (f.criteria.length === 0) {
+        push('bad', 'Keine Akzeptanzkriterien. Der Agent weiß nicht, wann er fertig ist.', 'Es wurden keine Akzeptanzkriterien vorgegeben. Schlage welche vor und lass sie von mir bestätigen.');
+      } else {
+        const weak = planWeakCriteria(f.criteria).map(i => 'K' + (i + 1));
+        if (weak.length) push('warn', `Nicht prüfbar formuliert: ${weak.join(', ')}. Was würdest du sehen, wenn es erfüllt ist?`, `Kriterium ${weak.join(', ')} ist vage. Formuliere es vor der Umsetzung als prüfbare Aussage und lass es bestätigen.`);
+        else push('ok', `${f.criteria.length} Kriterium/Kriterien, alle mit erkennbarem Prüfsignal.`);
+        if (f.criteria.length > 6) push('warn', `${f.criteria.length} Kriterien sind viel für einen Auftrag. Besser in zwei Aufträge teilen.`);
+      }
+
+      const blob = (f.goal + ' ' + f.criteria.join(' ')).toLowerCase();
+      const vague = PLAN_VAGUE_STEMS.filter(s => blob.includes(s));
+      if (vague.length) push('warn', `Vage Wörter in Ziel/Kriterien: ${vague.join(', ')}. Durch Messbares ersetzen.`, `Vage Begriffe (${vague.join(', ')}) nicht selbst interpretieren, sondern konkretisieren lassen.`);
+
+      if (f.nongoals.length === 0) push('warn', 'Keine Nicht-Ziele. Agenten weiten den Umfang gern aus.', 'Es sind keine Nicht-Ziele angegeben. Bei Zweifel nicht erweitern, sondern fragen.');
+      else push('ok', `${f.nongoals.length} Nicht-Ziel(e) gesetzt.`);
+
+      if (!f.testcmd) push('warn', 'Kein Prüfbefehl. Ohne ihn kann der Agent Ergebnisse nicht belegen.', 'Es gibt keinen vorgegebenen Prüfbefehl. Nenne in Schritt 1, wie du Ergebnisse prüfst.');
+      else push('ok', 'Prüfbefehl vorhanden.');
+
+      if (f.type !== 'custom' && planFiles.length === 0) push('warn', 'Kein Material hochgeladen. Der Ist-Stand kommt dann nur aus dem Arbeitsverzeichnis des Agenten.');
+      if (planFiles.some(x => x.truncated)) push('warn', 'Mindestens eine Datei war zu groß und wurde abgeschnitten.');
+
+      if (f.autonomy === 'auto' && ['migrate', 'refactor', 'github-repo'].includes(f.type)) {
+        push('warn', 'Durchlauf ohne Stopps bei einer riskanten Aufgabenart. Schrittweise ist hier sicherer.');
+      }
+      return { fields: f, items };
+    }
+
+    function runPlanCheck() {
+      const box = document.getElementById('plan-check');
+      if (!box) return;
+      const { items } = evaluatePlan();
+      const icon = { ok: '✅', warn: '⚠️', bad: '❌' };
+      box.innerHTML = items.map(i => `<div class="flex gap-2"><span>${icon[i.level]}</span><span>${escapeHtml(i.text)}</span></div>`).join('');
+      const ok = items.filter(i => i.level === 'ok').length;
+      document.getElementById('plan-check-score').textContent = `${ok} von ${items.length} in Ordnung`;
+    }
+
+    function updatePlanPrivacyNote() {
+      const el = document.getElementById('plan-privacy');
+      if (!el) return;
+      let host = 'den eingestellten API-Endpunkt';
+      try { host = new URL(userApiEndpoint).host; } catch (e) { /* Standardtext */ }
+      el.textContent = `„Auftrag erzeugen“ läuft lokal und sendet nichts. „Rückfragen“ und „Mit KI schärfen“ senden deine Angaben, die Datei-Inventur, gewählte Auszüge und ggf. den Projekt-Kontext an ${host}.`;
+    }
+
+    // ---------- Datei-Handling ----------
+    async function handlePlanFiles(evt) {
+      await handlePlanFileList(evt.target.files);
+      evt.target.value = '';
+    }
+
+    function pushPlanFile(name, text, type) {
+      planFiles.push({ name, content: text.slice(0, PLAN_MAX_CHARS), truncated: text.length > PLAN_MAX_CHARS, type });
+    }
+
+    async function handlePlanFileList(fileList) {
+      for (const file of fileList) {
+        if (file.name.toLowerCase().endsWith('.zip')) {
+          await extractZip(file);
+        } else {
+          pushPlanFile(file.name, await file.text(), file.type || 'text');
+        }
+      }
+      renderPlanFileList();
+      showToast(`${fileList.length} Datei(en) geladen`);
+    }
+
+    async function extractZip(file) {
+      try {
+        const zip = await JSZip.loadAsync(file);
+        const entries = Object.keys(zip.files).filter(n => !zip.files[n].dir);
+        const relevant = entries.filter(n =>
+          /\.(md|html|htm|txt|json|ts|tsx|js|jsx|py)$/i.test(n) &&
+          !n.includes('node_modules') && !n.includes('.git/')
+        ).slice(0, 20);
+        for (const name of relevant) {
+          pushPlanFile(name, await zip.files[name].async('string'), 'from-zip');
+        }
+        if (relevant.length === 0) showToast('ZIP enthält keine relevanten Text-/Code-Dateien');
+        else if (entries.length > relevant.length) showToast(`ZIP: ${relevant.length} von ${entries.length} Dateien übernommen`);
+      } catch (e) {
+        alert('ZIP konnte nicht gelesen werden: ' + e.message);
+      }
+    }
+
+    function renderPlanFileList() {
+      const el = document.getElementById('plan-file-list');
+      if (planFiles.length === 0) {
+        el.innerHTML = '';
+      } else {
+        el.innerHTML = planFiles.map((f, i) =>
+          `<div class="flex justify-between items-center bg-slate-950 border border-slate-800 rounded px-2 py-1">
+            <span>${escapeHtml(f.name)} <span class="text-slate-600">(${f.content.length} Z.${f.truncated ? ', abgeschnitten' : ''})</span></span>
+            <button onclick="planFiles.splice(${i},1);renderPlanFileList()" class="text-rose-400 text-[10px]">entfernen</button>
+          </div>`
+        ).join('') + `<button onclick="planFiles=[];renderPlanFileList()" class="text-[10px] text-rose-400 mt-1">Alle entfernen</button>`;
+      }
+      runPlanCheck();
+    }
+
+    // ---------- Generator ----------
+    function planGuardrailLines(f) {
+      const lines = buildGuardrails().split('\n').filter(l => l.trim() && !l.startsWith('- DATEI-LIMIT'));
+      if (document.getElementById('g-files')?.checked) lines.push('- DATEI-LIMIT PRO SCHRITT: Maximal 3 eng zusammenhängende Dateien je Schritt.');
+      return lines;
+    }
+
+    function buildPlanDraft() {
+      const { fields: f, items } = evaluatePlan();
+      const p = PLAN_PROFILES[f.type] || PLAN_PROFILES.custom;
+      const answered = planQA.filter(x => x.a && x.a.trim());
+      const bullets = (arr, empty) => arr.length ? arr.map(x => `- ${x}`).join('\n') : `- ${empty}`;
+      let out = `# Arbeitsauftrag: ${p.label}\n\n`;
+
+      out += `## Rolle\n${p.role}\n\n`;
+      out += `## Ziel\n${f.goal || '(nicht angegeben, wird in Schritt 2 mit mir geklärt)'}\n\n`;
+      if (answered.length) {
+        out += `### Klarstellungen von mir\n${answered.map(x => `- ${x.q}\n  → ${x.a.trim()}`).join('\n')}\n\n`;
+      }
+      out += `## Nicht-Ziele\n${bullets(f.nongoals, '(keine angegeben: bei Zweifel nicht erweitern, sondern nachfragen)')}\n\n`;
+
+      out += `## Ausgangslage\n`;
+      if (planFiles.length) {
+        out += `_Aus den Dateien extrahiert (Regex-Inventur, keine Vollanalyse). Prüfe sie in Schritt 1 gegen den echten Stand._\n\n`;
+        planFiles.forEach(file => {
+          const inv = planInventory(file);
+          out += `**${file.name}** (${inv.lines} Zeilen)\n${inv.facts.length ? inv.facts.map(x => `- ${x}`).join('\n') : '- keine Auffälligkeiten extrahiert'}\n\n`;
+        });
+      } else {
+        out += `Kein Material mitgegeben. Erhebe den Ist-Stand ausschließlich aus dem Arbeitsverzeichnis (Schritt 1).\n\n`;
+      }
+      if (f.useCtx && contextEntries.length) {
+        out += `**Projekt-Kontext (meine Notizen)**\n${getContextExcerpt(2000)}\n\n`;
+      }
+      if (f.embed && planFiles.length) {
+        out += `**Auszüge (jeweils Dateianfang, nur zur Orientierung)**\n`;
+        planFiles.slice(0, 6).forEach(file => {
+          out += `${file.name}:\n${PLAN_FENCE}\n${file.content.slice(0, 1500)}${file.content.length > 1500 ? '\n... [gekürzt]' : ''}\n${PLAN_FENCE}\n\n`;
+        });
+      }
+
+      const rules = [...f.constraints, ...p.rules, ...planGuardrailLines(f).map(l => l.replace(/^-\s*/, ''))];
+      out += `## Randbedingungen\n${bullets(rules, '(keine)')}\n\n`;
+
+      // Vorgehen
+      const modeText = {
+        plan: 'Modus NUR PLANEN: Ändere keine Dateien. Führe nur Schritt 1 und Schritt 2 (Diff-Plan) aus, dann STOPP und warte auf meine Freigabe.',
+        step: 'Modus SCHRITTWEISE: Nach jedem Schritt Bericht im Berichtsformat, dann STOPP und auf „weiter“ warten.',
+        auto: 'Modus DURCHLAUF: Führe die Schritte nacheinander aus. Halte nur bei einer Stopp-Regel an.'
+      }[f.autonomy];
+      const proveWith = f.testcmd ? `dem vorgegebenen Prüfweg (${f.testcmd})` : 'einem konkreten Befehl oder Test, den du benennst';
+      const steps = [];
+      steps.push({
+        t: 'Ist-Stand erheben (nur lesen)',
+        a: 'Lies die betroffenen Dateien und den Git-Stand. Vergleiche mit „Ausgangslage“. Weicht der Ist-Stand ab, melde das, bevor du weitermachst.',
+        v: f.testcmd ? `Prüfe mit ${proveWith} und berichte das Ergebnis als Ausgangswert.` : 'Es ist kein Prüfbefehl vorgegeben. Nenne, wie du Ergebnisse prüfen willst, und warte auf meine Bestätigung.'
+      });
+      const wait = (f.autonomy !== 'auto' || f.criteria.length === 0) ? ' Danach STOPP bis zu meiner Freigabe.' : '';
+      steps.push({
+        t: 'Diff-Plan vorlegen',
+        a: (f.criteria.length
+          ? 'Nenne pro Akzeptanzkriterium (K1 bis K' + f.criteria.length + ') die Dateien, die du ändern willst, und die Änderung in einem Satz. Keine Änderung außerhalb dieser Liste.'
+          : 'Es gibt keine Akzeptanzkriterien. Schlage 3 bis 5 prüfbare Kriterien vor und nenne pro Kriterium Dateien und Änderung.') + wait,
+        v: 'Die Liste liegt vor, es wurde noch nichts geändert (git status sauber).'
+      });
+      p.pre.forEach(s => steps.push(s));
+      const weakSet = new Set(planWeakCriteria(f.criteria));
+      f.criteria.forEach((c, i) => steps.push({
+        t: `K${i + 1} umsetzen`,
+        a: (weakSet.has(i) ? 'Dieses Kriterium ist vage. Formuliere es zuerst als prüfbare Aussage und warte auf meine Bestätigung. Erst danach umsetzen. ' : '') + `Setze um: „${c}“. Ein eigener Commit für dieses Kriterium.`,
+        v: `Weise mit ${proveWith} nach, dass gilt: „${c}“. Zeige Befehl und tatsächliche Ausgabe.`
+      }));
+      p.post.forEach(s => steps.push(s));
+      steps.push({
+        t: 'Gesamtprüfung und Bericht',
+        a: 'Führe alle Prüfungen erneut aus, auch die aus Schritt 1. Vergleiche mit dem Ausgangswert. Fasse die Änderungen mit git diff --stat zusammen.',
+        v: 'Bericht im Berichtsformat, jedes Akzeptanzkriterium einzeln mit Nachweis oder „nicht geprüft“.'
+      });
+
+      out += `## Vorgehen\n${modeText}\n\n`;
+      steps.forEach((s, i) => {
+        out += `### Schritt ${i + 1}: ${s.t}\n- Auftrag: ${s.a}\n- Prüfung: ${s.v}\n\n`;
+      });
+
+      out += `## Akzeptanzkriterien\n`;
+      out += f.criteria.length
+        ? f.criteria.map((c, i) => `- K${i + 1}: ${c}`).join('\n')
+        : '- (keine vorgegeben: werden in Schritt 2 vorgeschlagen und von mir bestätigt)';
+      out += '\n\n';
+
+      out += `## Stopp- und Rückfrageregeln\n`;
+      out += `- Halte an und frage nach, wenn eine Datei außerhalb des Diff-Plans geändert werden müsste.\n`;
+      out += `- Halte an, wenn der Ist-Stand von der Ausgangslage abweicht.\n`;
+      out += `- Halte an, wenn ein Test nur dadurch grün würde, dass du den Test änderst.\n`;
+      out += `- Halte an, wenn Anforderungen sich widersprechen oder du eine Annahme treffen müsstest, die hier nicht steht.\n`;
+      out += `- Schlägt eine Prüfung fehl: höchstens 2 Korrekturversuche pro Schritt, dann STOPP mit der vollständigen Fehlerausgabe.\n\n`;
+
+      out += `## Berichtsformat\nNach jedem Schritt:\n`;
+      out += `1. Erledigt: was genau, welche Dateien.\n`;
+      out += `2. Geprüft: Befehl und tatsächliche Ausgabe bzw. Exit-Code. Kein „sollte funktionieren“.\n`;
+      out += `3. Nicht geprüft: was du nicht verifizieren konntest und warum.\n`;
+      out += `4. Abweichungen vom Plan.\n`;
+      out += `5. Nächster Schritt.\n`;
+      out += `Behaupte nichts als erledigt, was du nicht ausgeführt und gesehen hast.\n\n`;
+
+      const open = items.filter(i => i.open).map(i => i.open);
+      out += `## Offene Fragen\n${bullets(open, 'Keine bekannt. Melde Unklarheiten trotzdem, statt zu raten.')}\n`;
+      return out;
+    }
+
+    function setPlanStatus(msg) {
+      const el = document.getElementById('plan-status');
+      if (el) el.textContent = msg;
+    }
+
+    function generatePlan() {
+      const f = readPlanFields();
+      if (!f.goal && planFiles.length === 0) {
+        alert('Bitte mindestens ein Ziel beschreiben oder Material hochladen.');
+        return;
+      }
+      document.getElementById('plan-output').innerText = buildPlanDraft();
+      setPlanStatus('Lokal erzeugt aus Vorlage und Regex-Inventur. Keine KI beteiligt, nichts gesendet.');
+      runPlanCheck();
+      showToast('Auftrag erzeugt');
+    }
+
+    // ---------- KI-Funktionen ----------
+    async function planCallAI(system, user, temperature) {
+      const response = await fetch(userApiEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${userApiKey}` },
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+          temperature
+        })
+      });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const data = await response.json();
+      const text = data?.choices?.[0]?.message?.content;
+      if (!text) throw new Error('Keine Antwort');
+      return text.trim();
+    }
+
+    function planAiExcerpts() {
+      return planFiles.slice(0, 6).map(f => `### ${f.name}\n${f.content.slice(0, 2500)}`).join('\n\n');
+    }
+
+    async function planAskQuestions() {
+      if (!userApiKey) { alert('Kein API-Key hinterlegt (Tab „Modelle“). Ohne Key kannst du nur lokal erzeugen.'); return; }
+      const { fields: f, items } = evaluatePlan();
+      if (!f.goal) { alert('Bitte zuerst ein Ziel eintragen.'); return; }
+      updatePlanPrivacyNote();
+      const btn = document.getElementById('plan-q-btn');
+      const original = btn.innerHTML;
+      btn.innerHTML = '⏳ ...'; btn.disabled = true;
+      const system = 'Du prüfst Anforderungen für einen Coding-Agenten. Gib ausschließlich ein JSON-Array mit höchstens 5 kurzen Rückfragen (Strings, Deutsch) zurück. Gefragt wird nur, was für eine eindeutig prüfbare Umsetzung fehlt. Keine Frage, die aus den Angaben bereits beantwortet ist. Keine Erklärung, keine Codeblöcke.';
+      const inventory = planFiles.map(x => `${x.name}: ${planInventory(x).facts.join(' | ')}`).join('\n');
+      const user = `Aufgabenart: ${f.type}\nZiel: ${f.goal}\nKriterien:\n${f.criteria.join('\n') || '(keine)'}\nNicht-Ziele:\n${f.nongoals.join('\n') || '(keine)'}\nRandbedingungen:\n${f.constraints.join('\n') || '(keine)'}\nPrüfbefehl: ${f.testcmd || '(keiner)'}\nBekannte Lücken:\n${items.filter(i => i.level !== 'ok').map(i => i.text).join('\n') || '(keine)'}\nInventur:\n${inventory || '(kein Material)'}`;
+      try {
+        const raw = await planCallAI(system, user, 0.2);
+        const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
+        if (!Array.isArray(parsed)) throw new Error('Antwort ist kein Array');
+        planQA = parsed.filter(q => typeof q === 'string' && q.trim()).slice(0, 5).map(q => ({ q: q.trim(), a: '' }));
+        renderPlanQA();
+        showToast(planQA.length ? 'Rückfragen geladen' : 'Keine Rückfragen nötig');
+      } catch (err) {
+        alert('Rückfragen fehlgeschlagen: ' + err.message);
+      } finally {
+        btn.innerHTML = original; btn.disabled = false;
+      }
+    }
+
+    function renderPlanQA() {
+      const box = document.getElementById('plan-qa-box');
+      const list = document.getElementById('plan-qa-list');
+      if (!planQA.length) { box.classList.add('hidden'); list.innerHTML = ''; return; }
+      box.classList.remove('hidden');
+      list.innerHTML = planQA.map((x, i) =>
+        `<div>
+          <p class="text-xs text-slate-300 mb-1">${escapeHtml(x.q)}</p>
+          <textarea rows="2" oninput="planQA[${i}].a=this.value" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 font-mono">${escapeHtml(x.a)}</textarea>
+        </div>`
+      ).join('');
+    }
+
+    async function generatePlanWithAI() {
+      if (!userApiKey) { alert('Kein API-Key hinterlegt (Tab „Modelle“). Nutze „Auftrag erzeugen“ für die lokale Version.'); return; }
+      const f = readPlanFields();
+      if (!f.goal && planFiles.length === 0) { alert('Bitte Ziel angeben oder Material hochladen.'); return; }
+      updatePlanPrivacyNote();
+      const btn = document.getElementById('plan-ai-btn');
+      const original = btn.innerHTML;
+      btn.innerHTML = '⏳ ...'; btn.disabled = true;
+
+      const draft = buildPlanDraft();
+      document.getElementById('plan-output').innerText = draft;
+
+      const system = `Du überarbeitest einen ARBEITSAUFTRAG für einen Coding-Agenten (Claude Code). Du bekommst einen lokal erzeugten Entwurf und Auszüge der Quelldateien.
+Regeln:
+- Behalte alle Abschnittsüberschriften (## Rolle bis ## Offene Fragen) exakt und in derselben Reihenfolge.
+- Verwende nur Dateien, Funktionen und Fakten, die im Entwurf oder in den Auszügen stehen. Erfinde nichts. Was du vermutest, markierst du mit "ANNAHME:".
+- Jeder Schritt hat "Auftrag" und "Prüfung". Die Prüfung nennt einen konkreten Befehl oder eine konkret sichtbare Beobachtung, nie "sicherstellen, dass es funktioniert".
+- Konkretisiere die Schritte anhand der Inventur (welche Datei, welche Funktion). Ersetze vage Formulierungen durch prüfbare. Geht das nicht, schreibe eine Frage unter "Offene Fragen".
+- Nicht-Ziele, Randbedingungen, Stopp-Regeln und Berichtsformat dürfen nicht gelockert werden. Ergänzen ist erlaubt.
+- Streiche Redundanz. Keine Einleitung, keine Schlussbemerkung. Nur der Auftrag in Markdown, Deutsch.`;
+      const user = `ENTWURF:\n${draft}\n\n---\nAUSZÜGE (nur zur Orientierung):\n${planAiExcerpts() || '(kein Material)'}`;
+
+      try {
+        const text = await planCallAI(system, user, 0.2);
+        const missing = PLAN_REQUIRED_HEADINGS.filter(h => !text.includes(h));
+        if (missing.length) {
+          setPlanStatus(`KI-Antwort verworfen, Abschnitte fehlten: ${missing.join(', ')}. Angezeigt wird der lokale Entwurf.`);
+          alert('KI-Antwort verworfen: Es fehlen Abschnitte (' + missing.join(', ') + '). Der lokale Entwurf bleibt stehen.');
+        } else {
+          document.getElementById('plan-output').innerText = text;
+          setPlanStatus('Von der KI überarbeitet, Struktur geprüft (alle Pflichtabschnitte vorhanden). Inhalt bitte selbst gegenlesen: Die KI kann Dateien falsch zuordnen.');
+          showToast('Auftrag geschärft');
+        }
+      } catch (err) {
+        setPlanStatus('KI-Aufruf fehlgeschlagen (' + err.message + '). Angezeigt wird der lokale Entwurf.');
+        alert('KI-Aufruf fehlgeschlagen: ' + err.message);
+      } finally {
+        btn.innerHTML = original; btn.disabled = false;
+      }
+    }
+
+    function sendPlanToPrompt() {
+      const text = document.getElementById('plan-output').innerText;
+      if (!text || text.startsWith('Trage Ziel')) {
+        alert('Zuerst einen Auftrag erzeugen.');
+        return;
+      }
+      document.getElementById('task-input').value = planVal('plan-goal') || text.slice(0, 2000);
+      document.getElementById('prompt-output').innerText = text;
+      switchTab('prompt');
+      showToast('Auftrag in Prompt-Tab übernommen');
+    }
+
+    // ========== SESSION ANALYZER ==========
+    function analyzeSessionLocal() {
+      const log = document.getElementById('session-log').value.trim();
+      if (!log) { alert('Bitte Session-Verlauf einfügen.'); return; }
+      const focus = document.getElementById('session-focus').value.trim();
+
+      // Heuristic analysis
+      const lines = log.split(/\n/);
+      const errors = [];
+      const forgotten = [];
+      const lessons = [];
+      const tools = new Set();
+      let hasTestFail = false;
+      let hasSed = false;
+      let hasRefactor = false;
+      let hasClaimWithoutVerify = false;
+
+      const errorPatterns = [
+        /error|fehler|failed|exception|traceback|ENOENT|EACCES|TypeError|ReferenceError/i,
+        /test.*fail|FAIL |✕ |× /i,
+        /cannot find|not found|undefined is not/i
+      ];
+      const claimPatterns = [
+        /fertig|done|erledigt|sollte funktionieren|works now|fixed/i
+      ];
+
+      lines.forEach((line, i) => {
+        errorPatterns.forEach(p => {
+          if (p.test(line) && errors.length < 15) {
+            errors.push(`L${i + 1}: ${line.trim().slice(0, 180)}`);
+          }
+        });
+        if (/sed\s+-i|sed -i/i.test(line)) hasSed = true;
+        if (/refactor|umbenannt|renamed|cleanup|aufräum/i.test(line)) hasRefactor = true;
+        if (/vitest|jest|mocha|pytest|tsc --noEmit/i.test(line) && /fail|error/i.test(line)) hasTestFail = true;
+        if (claimPatterns.some(p => p.test(line)) && !/git diff|test.*pass|✓|PASS/i.test(line)) {
+          hasClaimWithoutVerify = true;
+        }
+        const toolMatch = line.match(/\b(Bash|Write|Edit|Read|MultiEdit|Glob|Grep)\b/);
+        if (toolMatch) tools.add(toolMatch[1]);
+      });
+
+      if (hasSed) forgotten.push('Sed auf Code-Dateien erkannt – sollte durch atomare Patches ersetzt werden.');
+      if (hasRefactor && !/bestätig|confirm|ok/i.test(log)) forgotten.push('Möglicherweise ungefragtes Refactoring ohne explizite Bestätigung.');
+      if (hasTestFail) forgotten.push('Tests sind fehlgeschlagen – prüfen ob Assertions manipuliert wurden statt den Bug zu fixen.');
+      if (hasClaimWithoutVerify) forgotten.push('Erfolgs-Behauptungen ohne sichtbaren Test-/Diff-Nachweis – Vertrauensregel prüfen.');
+      if (!/git (status|diff|log)/i.test(log)) forgotten.push('Kein git status/diff im Verlauf – Checkpoint-Disziplin fehlte evtl.');
+
+      lessons.push('Immer Exit-Codes und stderr auswerten, nicht nur stdout.');
+      lessons.push('Nach jeder nicht-trivialen Änderung: Testlauf + git diff zeigen.');
+      if (tools.has('Bash') && tools.has('Write')) lessons.push('Shell- und Write-Tools gemischt – auf unnötige Zwischen-Schritte achten.');
+      if (focus) lessons.push(`Fokus dieser Session war: ${focus} – entsprechende Regeln in CLAUDE.md verstärken.`);
+
+      let out = `# Session-Analyse (lokal / heuristisch)\n\n`;
+      out += `**Umfang:** ${lines.length} Zeilen · erkannte Tools: ${[...tools].join(', ') || 'keine'}\n`;
+      if (focus) out += `**Fokus:** ${focus}\n`;
+      out += `\n## 1. Erkannte Fehler / Warnsignale\n`;
+      out += errors.length ? errors.map(e => `- ${e}`).join('\n') : '- Keine offensichtlichen Error-Patterns gefunden.\n';
+      out += `\n\n## 2. Was möglicherweise vergessen / vernachlässigt wurde\n`;
+      out += forgotten.length ? forgotten.map(f => `- ${f}`).join('\n') : '- Keine klaren Auslassungen erkannt.\n';
+      out += `\n\n## 3. Was man sich merken sollte (Lektionen)\n`;
+      out += lessons.map(l => `- ${l}`).join('\n');
+      out += `\n\n## 4. Empfohlene nächste Schritte\n`;
+      out += `- Relevante Lektionen in den Projekt-Kontext übernehmen (Button unten).\n`;
+      out += `- CLAUDE.md um fehlende harte Regeln ergänzen (Tab CLAUDE.md → Säubern).\n`;
+      out += `- Bei wiederkehrenden Fehlern: entsprechenden PreToolUse-Hook aktivieren.\n`;
+
+      lastSessionAnalysis = out;
+      document.getElementById('session-output').innerText = out;
+      showToast('Lokale Analyse fertig');
+    }
+
+    async function analyzeSessionWithAI() {
+      const log = document.getElementById('session-log').value.trim();
+      if (!log) { alert('Bitte Session-Verlauf einfügen.'); return; }
+      if (!userApiKey) {
+        alert('Kein DeepSeek Key – nutze die lokale Analyse.');
+        analyzeSessionLocal();
+        return;
+      }
+
+      const btn = document.getElementById('session-ai-btn');
+      const original = btn.innerHTML;
+      btn.innerHTML = '⏳ ...'; btn.disabled = true;
+
+      const focus = document.getElementById('session-focus').value.trim();
+      const truncated = log.slice(0, 14000);
+
+      const systemPrompt = `Du analysierst Claude-/Agenten-Session-Logs. Extrahiere präzise:
+1. Konkrete Fehler und Fehlentscheidungen (mit Zitat/Hinweis)
+2. Was vergessen oder übersprungen wurde (Tests, Diff, Bestätigung, Scope)
+3. Lektionen, die man sich merken und in CLAUDE.md/Kontext übernehmen sollte
+Antworte auf Deutsch als strukturiertes Markdown. Keine Präambel.`;
+
+      try {
+        const response = await fetch(userApiEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${userApiKey}` },
+          body: JSON.stringify({
+            model: 'deepseek-chat',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: (focus ? `Fokus: ${focus}\n\n` : '') + truncated }
+            ],
+            temperature: 0.3
+          })
+        });
+        if (!response.ok) throw new Error(response.status);
+        const data = await response.json();
+        const text = data?.choices?.[0]?.message?.content;
+        if (text) {
+          lastSessionAnalysis = text.trim();
+          document.getElementById('session-output').innerText = lastSessionAnalysis;
+          showToast('KI-Analyse fertig');
+        } else throw new Error('Keine Antwort');
+      } catch (err) {
+        alert('KI-Analyse fehlgeschlagen: ' + err.message);
+        analyzeSessionLocal();
+      } finally {
+        btn.innerHTML = original; btn.disabled = false;
+      }
+    }
+
+    function saveSessionLessonsToContext() {
+      const analysis = document.getElementById('session-output').innerText;
+      if (!analysis || analysis.includes('Füge einen Session-Verlauf')) {
+        alert('Zuerst eine Analyse durchführen.');
+        return;
+      }
+      // Extract lessons section roughly
+      const match = analysis.match(/## 3[\s\S]*?(?=## 4|$)/i) || analysis.match(/Lektionen[\s\S]*/i);
+      const lessons = match ? match[0] : analysis.slice(0, 2000);
+      addContextEntry('Session-Lektionen ' + new Date().toLocaleDateString('de-DE'), lessons);
+      showToast('Lektionen im Kontext gespeichert');
+    }
+
+    // ========== CONTENT GENERATOR ==========
+
+    function alexVoiceLocalPosts(source, limit) {
+      const s = source || '';
+      const acp = /acp|request_permission|cline --acp|session\/request_permission/i.test(s);
+      const mcp = /\bMCP\b/i.test(s);
+      const red = /rot|partial|no_structured|kein .*permission|timeout|120/i.test(s);
+      const adr = /ADR|Architekturentscheidung|Sub-Schritt|1\.12|1\.11/i.test(s);
+      const protocol = acp && !/MCP-Transport.*produktiv verwendet/i.test(s)
+        ? 'ACP (Cline)'
+        : (mcp && acp ? 'ACP live, MCP erst nach Entscheidung' : (mcp ? 'MCP (nur geplant, nicht als Ist behaupten)' : 'der echte Transport, nicht das Diagramm'));
+      const status = red
+        ? 'Der letzte Canary war rot: kein Permission-Call, kein Evidence-Package. 1.11 bleibt partial.'
+        : 'Nur behaupten, was der Lauf gezeigt hat.';
+      const x = [
+        'Kein zweites Sicherheitsmodell vor der Transportentscheidung.',
+        protocol + ' ist der Ist-Pfad — nicht das Gateway-Plakat.',
+        status,
+        adr ? 'Zuerst ADR: wer die Session besitzt, wo Deny-Evidence liegt, ein sichtbares Gateway.' : 'Entscheidung vor Code.',
+        'bewusstki.de'
+      ].join(' ');
+      const short = x.length <= limit ? x : ('Canary rot. Kein Hook, kein Package. Erst Transport entscheiden, dann 1.12 weiterbauen. bewusstki.de');
+      const fb = [
+        'Sub-Schritte ohne Transportentscheidung sind ein zweites, unverdrahtetes Modell.',
+        '',
+        'Was der Lauf gezeigt hat:',
+        '• Deploy und Suite können grün sein — der Canary trotzdem rot.',
+        '• Fehlt session/request_permission, gibt es kein Observer-Receipt und kein Package.',
+        '• ACP und MCP sind nicht dasselbe. Ein Bild mit MCP in der Mitte ist kein Nachweis.',
+        '',
+        'Als Nächstes nur die ADR: konkreter Transport, Session-Besitz, ein Gateway, Deny-Evidence im bestehenden Package.',
+        'Kein „verfügbar“-Claim vor Canary plus Akte.',
+        '',
+        'bewusstki.de'
+      ].join('\n');
+      return {
+        x: short.slice(0, limit),
+        bluesky: short.slice(0, Math.min(limit, 300)),
+        facebook: fb.slice(0, Math.max(limit, 500)),
+        image_prompt: 'Keine Marketing-Architektur. Schlichtes Schema: Auftrag → Rechte → Agent → Akte. Ein Gateway. Kein MCP-Label wenn der Lauf ACP war. Kein VERIFIED-Stempel. Keine Tippfehler.'
+      };
+    }
+
+    function renderLocalContentCards(posts) {
+      const platforms = Array.from(document.querySelectorAll('.content-platform:checked')).map(c => c.value);
+      const platformConfig = { x: { label: 'X', limit: 280 }, bluesky: { label: 'Bluesky', limit: 300 }, facebook: { label: 'Facebook', limit: 600 } };
+      const hashtags = document.getElementById('content-hashtags').value.trim();
+      const resultsEl = document.getElementById('content-results');
+      resultsEl.innerHTML = '';
+      platforms.forEach(pk => {
+        const p = platformConfig[pk];
+        const body = (posts[pk] || posts.x || '').trim();
+        const full = hashtags ? body + '\n\n' + hashtags : body;
+        const card = document.createElement('div');
+        card.className = 'bg-slate-900 border border-slate-800 rounded-2xl p-5';
+        card.innerHTML = `
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-sm font-semibold text-indigo-300">${p.label} · lokal</span>
+              <span class="text-[11px] font-mono text-slate-400">${full.length}/${p.limit}</span>
+            </div>
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm whitespace-pre-wrap" contenteditable="true">${escapeHtml(full)}</div>
+            <div class="flex gap-2 mt-2">
+              <button onclick="navigator.clipboard.writeText(this.closest('div').previousElementSibling.innerText).then(()=>showToast('Kopiert'))" class="bg-emerald-700 hover:bg-emerald-600 text-white text-xs px-3 py-1.5 rounded-lg">Kopieren</button>
+            </div>
+            <div class="mt-2 text-[11px] text-slate-500">Bild-Prompt: ${escapeHtml(posts.image_prompt)}</div>
+            <div class="mt-2 text-[10px] text-slate-600">Lokal aus Kontextregeln — keine KI, kein fertig-Claim.</div>`;
+        resultsEl.appendChild(card);
+      });
+    }
+
+    function generateContentPostsLocal() {
+      const source = document.getElementById('content-source').value.trim();
+      if (!source) { alert('Bitte Quelle / Kontext angeben.'); return; }
+      const platforms = Array.from(document.querySelectorAll('.content-platform:checked')).map(c => c.value);
+      if (!platforms.length) { alert('Mindestens eine Plattform wählen.'); return; }
+      renderLocalContentCards(alexVoiceLocalPosts(source, 280));
+      showToast('Lokale Posts erzeugt');
+    }
+
+    function loadContextIntoContent() {
+      const excerpt = getContextExcerpt(2500);
+      if (!excerpt) {
+        alert('Kein Kontext vorhanden.');
+        return;
+      }
+      document.getElementById('content-source').value = excerpt;
+      showToast('Kontext geladen');
+    }
+
+    async function generateContentPosts() {
+      const key = document.getElementById('content-deepseek-key').value.trim() || userApiKey;
+      if (!key) { alert('DeepSeek Key fehlt.'); return; }
+
+      const source = document.getElementById('content-source').value.trim();
+      if (!source) { alert('Bitte Quelle / Kontext angeben.'); return; }
+
+      const platforms = Array.from(document.querySelectorAll('.content-platform:checked')).map(c => c.value);
+      if (platforms.length === 0) { alert('Mindestens eine Plattform wählen.'); return; }
+
+      const btn = document.getElementById('content-gen-btn');
+      btn.disabled = true;
+      btn.innerHTML = '⏳ Generiere…';
+
+      const audience = document.getElementById('content-audience').value;
+      const tone = document.getElementById('content-tone').value;
+      const cta = document.getElementById('content-cta').value;
+      const hashtags = document.getElementById('content-hashtags').value.trim();
+      const genImages = document.getElementById('content-gen-images').checked;
+      const geminiKey = document.getElementById('content-gemini-key').value.trim();
+
+      const platformConfig = {
+        x: { label: 'X', limit: 280 },
+        bluesky: { label: 'Bluesky', limit: 300 },
+        facebook: { label: 'Facebook', limit: 600 }
+      };
+
+      const ctaMap = {
+        none: '',
+        website: 'Rufe zum Besuch von bewusstki.de auf.',
+        github: 'Rufe zum Ansehen des GitHub-Repos auf.',
+        try: 'Rufe zum Ausprobieren auf.',
+        comment: 'Lade zum Kommentieren ein.'
+      };
+
+      const resultsEl = document.getElementById('content-results');
+      resultsEl.innerHTML = '';
+
+      for (const pk of platforms) {
+        const p = platformConfig[pk];
+        const card = document.createElement('div');
+        card.className = 'bg-slate-900 border border-slate-800 rounded-2xl p-5';
+        card.innerHTML = `<div class="text-sm font-semibold text-indigo-300 mb-2">${p.label}</div><div class="text-xs text-slate-500"><span class="spinner inline-block w-3 h-3 border-2 border-slate-600 border-t-indigo-400 rounded-full animate-spin"></span> Generiere…</div>`;
+        resultsEl.appendChild(card);
+
+        try {
+          const systemPrompt = `Du schreibst Posts für bewusstki.de / ALEX. Kein Marketing-Theater.
+Regeln:
+- Nur Fakten aus dem Kontext. Kein „fertig“, „sicher“, „live proof“, „MCP produktiv“, wenn der Kontext das nicht belegt.
+- ACP und MCP nicht verwechseln. Steht im Kontext Cline/--acp/request_permission: ACP schreiben, nicht MCP-Gateway als Ist-Stand.
+- Rot, partial, Timeout, fehlender Permission-Call bleiben rot. Kein grünes Diagramm daraus machen.
+- Stimme: kurz, konkret, Listen erlaubt, keine Buzzwords (fail-closed als Label vermeiden wenn der Satz ohne geht).
+- Kein VERIFIED-Stempel. Kein Bildprompt mit falschem Protokoll.
+Antworte NUR mit JSON: {"text":"...","hashtags":["..."],"image_prompt":"..."}.
+text ohne Hashtags, unter ${p.limit} Zeichen. image_prompt nur wenn der Kontext ein ehrliches Schema hergibt.`;
+          const userPrompt = `Plattform: ${p.label}\nZielgruppe: ${audience}\nTon: ${tone}\nCTA: ${ctaMap[cta] || ''}\nFixe Hashtags: ${hashtags || 'keine'}\n\nInhalt/Kontext:\n${source.slice(0, 4000)}`;
+
+          const res = await fetch(userApiEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+            body: JSON.stringify({
+              model: 'deepseek-chat',
+              messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+              temperature: 0.8
+            })
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          let raw = data.choices?.[0]?.message?.content || '';
+          raw = raw.replace(/^```json/i, '').replace(/```$/g, '').trim();
+          const parsed = JSON.parse(raw);
+
+          const tags = (parsed.hashtags || []).map(h => h.startsWith('#') ? h : '#' + h).join(' ');
+          const fullText = tags ? `${parsed.text}\n\n${tags}` : parsed.text;
+
+          let imgHtml = '';
+          if (genImages && geminiKey && parsed.image_prompt) {
+            try {
+              const imgUrl = await generateGeminiImage(parsed.image_prompt, geminiKey);
+              imgHtml = `<div class="mt-3"><img src="${imgUrl}" class="max-w-full rounded-lg border border-slate-700" alt="Bild"></div>`;
+            } catch (ie) {
+              imgHtml = `<div class="mt-2 text-[11px] text-rose-400">Bildfehler: ${escapeHtml(ie.message)}</div>`;
+            }
+          }
+
+          card.innerHTML = `
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-sm font-semibold text-indigo-300">${p.label}</span>
+              <span class="text-[11px] font-mono text-slate-400">${fullText.length}/${p.limit}</span>
+            </div>
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm whitespace-pre-wrap" contenteditable="true">${escapeHtml(fullText)}</div>
+            <div class="flex gap-2 mt-2">
+              <button onclick="navigator.clipboard.writeText(this.closest('div').previousElementSibling.innerText).then(()=>showToast('Kopiert'))" class="bg-emerald-700 hover:bg-emerald-600 text-white text-xs px-3 py-1.5 rounded-lg">Kopieren</button>
+            </div>
+            ${parsed.image_prompt ? `<div class="mt-2 text-[11px] text-slate-500">Bild-Prompt: ${escapeHtml(parsed.image_prompt)}</div>` : ''}
+            ${imgHtml}
+            <div class="mt-2 text-[10px] text-slate-600">ⓘ KI-generierter Inhalt</div>
+          `;
+        } catch (e) {
+          card.innerHTML = `<div class="text-sm font-semibold text-indigo-300 mb-2">${p.label}</div><div class="text-xs text-rose-400">Fehler: ${escapeHtml(e.message)}</div>`;
+        }
+      }
+
+      btn.disabled = false;
+      btn.innerHTML = '✨ Posts generieren';
+      showToast('Content generiert');
+    }
+
+    async function generateGeminiImage(prompt, key) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${key}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt + ' No text in the image. Clean modern style.' }] }],
+          generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
+        })
+      });
+      if (!res.ok) {
+        // Fallback model attempt
+        const url2 = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${key}`;
+        const res2 = await fetch(url2, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt + ' No text in the image.' }] }],
+            generationConfig: { responseModalities: ['IMAGE'] }
+          })
+        });
+        if (!res2.ok) throw new Error(`Gemini ${res2.status}`);
+        const data2 = await res2.json();
+        const parts2 = data2.candidates?.[0]?.content?.parts || [];
+        const img2 = parts2.find(p => p.inlineData || p.inline_data);
+        if (!img2) throw new Error('Kein Bild in Antwort');
+        const inline2 = img2.inlineData || img2.inline_data;
+        return `data:${inline2.mimeType || inline2.mime_type};base64,${inline2.data}`;
+      }
+      const data = await res.json();
+      const parts = data.candidates?.[0]?.content?.parts || [];
+      const img = parts.find(p => p.inlineData || p.inline_data);
+      if (!img) throw new Error('Kein Bild in Antwort');
+      const inline = img.inlineData || img.inline_data;
+      return `data:${inline.mimeType || inline.mime_type};base64,${inline.data}`;
+    }
+
+    // ========== META ==========
+    function renderModelCards() {
+      const container = document.getElementById('model-cards');
+      container.innerHTML = Object.entries(MODEL_FAILURE_MODES).map(([key, m]) => `
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5">
+          <div class="text-sm font-semibold text-slate-200 mb-1.5">${m.label}</div>
+          <div class="flex flex-wrap gap-1.5 mb-2">
+            ${m.modes.map(mode => `<span class="text-[10px] font-mono bg-rose-950/40 text-rose-300 border border-rose-900/50 px-1.5 py-0.5 rounded">${mode}</span>`).join('')}
+          </div>
+          <ul class="text-[11px] text-slate-400 space-y-1 list-disc list-inside">
+            ${m.countermeasures.map(c => `<li>${c}</li>`).join('')}
+          </ul>
+        </div>`).join('');
+    }
+
+    function seedVisionContext() {
+      contextEntries.unshift({ id: Date.now(), ts: new Date().toISOString(), label: 'ALEX Meta-OS Vision (Grundlage)', text: VISION_SEED_TEXT });
+      persistContext();
+      renderContextList();
+      showToast('Vision als Kontext gespeichert');
+    }
+
+    // ========== GENESIS INTEGRATION ==========
+    let genesisImport = null; // { type: 'json'|'md', data, markdown, meta }
+
+    function copyStudioKeyHint() {
+      const hint = userApiKey
+        ? 'DeepSeek-Key ist im Studio gespeichert (localStorage: deepseek_api_key). Genesis liest denselben Key automatisch, wenn beide Dateien im gleichen Browser geöffnet werden.'
+        : 'Im Studio oben rechts einen DeepSeek-Key speichern — Genesis nutzt denselben localStorage-Eintrag.';
+      copyDirectText(hint);
+    }
+
+    function handleGenesisImport(evt) {
+      const file = evt.target.files[0];
+      if (file) processGenesisFile(file);
+      evt.target.value = '';
+    }
+
+    async function processGenesisFile(file) {
+      const text = await file.text();
+      const status = document.getElementById('genesis-import-status');
+      try {
+        if (/\.json$/i.test(file.name) || text.trim().startsWith('{')) {
+          const data = JSON.parse(text);
+          if (data.app !== 'genesis') throw new Error('Keine Genesis-Projektdatei (app ≠ "genesis").');
+          const ops = (data.patterns && data.patterns.muster) ? data.patterns.muster.filter(m => m.operation).length : 0;
+          const claims = (data.claims || []).length;
+          const spann = (data.spannungen && data.spannungen.items) ? data.spannungen.items.length : 0;
+          genesisImport = {
+            type: 'json',
+            data,
+            markdown: genesisProjectToMarkdown(data),
+            meta: {
+              savedAt: data.savedAt,
+              phases: (data.phases || []).length,
+              patterns: (data.patterns && data.patterns.muster) ? data.patterns.muster.length : 0,
+              moments: countGenesisMoments(data),
+              ops, claims, spann
+            }
+          };
+          status.textContent = `Projekt geladen (${new Date(data.savedAt || Date.now()).toLocaleString('de-DE')}) · ${genesisImport.meta.phases} Phasen · ${genesisImport.meta.patterns} Muster · ${ops} Ops · ${claims} Behauptungen · ${spann} Spannungen`;
+        } else {
+          genesisImport = {
+            type: 'md',
+            data: null,
+            markdown: text,
+            meta: { savedAt: null, phases: 0, patterns: (text.match(/^### Muster /gm) || []).length, moments: 0 }
+          };
+          status.textContent = `Markdown geladen (${file.name}, ${text.length} Zeichen)`;
+        }
+        document.getElementById('genesis-actions').style.display = 'block';
+        renderGenesisPreview();
+        showToast('Genesis-Ergebnis importiert');
+      } catch (e) {
+        status.textContent = 'Import fehlgeschlagen: ' + e.message;
+        genesisImport = null;
+        document.getElementById('genesis-actions').style.display = 'none';
+        document.getElementById('genesis-preview').innerHTML = `<p class="text-rose-400">${escapeHtml(e.message)}</p>`;
+      }
+    }
+
+    function countGenesisMoments(data) {
+      let n = 0;
+      (data.phases || []).forEach(p => {
+        if (p.result && Array.isArray(p.result.momente)) n += p.result.momente.length;
+      });
+      return n;
+    }
+
+    function genesisProjectToMarkdown(data) {
+      const L = [];
+      L.push('# Genesis: Importierte Rekonstruktion', '');
+      L.push(`Gesichert: ${data.savedAt || '–'}`, '');
+      if (data.timeline) {
+        L.push(`Artefakte: ${data.timeline.count || '?'}`, '');
+        if (data.timeline.warnings && data.timeline.warnings.length) {
+          L.push('**Hinweise:**');
+          data.timeline.warnings.forEach(w => L.push('- ' + w));
+          L.push('');
+        }
+      }
+      // Moments from phases
+      (data.phases || []).forEach(p => {
+        if (!p.result || !p.result.momente) return;
+        p.result.momente.forEach(m => {
+          L.push(`### ${m.titel || 'Moment'} (${m.datum || ''}, ${m.typ || ''})`, '');
+          if (m.beobachtung) L.push(`**Beobachtung:** ${m.beobachtung}`, '');
+          if (m.interpretation) L.push(`**Interpretation:** ${m.interpretation}`, '');
+          if (m.answers) {
+            const entries = Object.entries(m.answers).filter(([, v]) => String(v || '').trim());
+            if (entries.length) {
+              L.push('**Antworten:**');
+              entries.forEach(([k, v]) => L.push(`- ${k}: ${v}`));
+              L.push('');
+            }
+          }
+        });
+      });
+      if (data.patterns && data.patterns.muster) {
+        L.push('## Muster', '');
+        data.patterns.muster.forEach((x, i) => {
+          L.push(`### Muster ${i + 1}: ${x.titel || '?'} (Sicherheit: ${x.sicherheit || '?'})`, '');
+          if (x.beobachtung) L.push(`**Beobachtung:** ${x.beobachtung}`, '');
+          if (x.belege && x.belege.length) { L.push('**Belege:**'); x.belege.forEach(b => L.push('- ' + b)); L.push(''); }
+          if (x.gegenbelege && x.gegenbelege.length) { L.push('**Gegenbelege:**'); x.gegenbelege.forEach(b => L.push('- ' + b)); L.push(''); }
+          if (x.moegliche_gefahr) L.push(`**Mögliche Gefahr:** ${x.moegliche_gefahr}`, '');
+          if (x.eigene_erklaerung) L.push(`**Eigene Erklärung:** ${x.eigene_erklaerung}`, '');
+          if (x.uebertragbarkeit) L.push(`**Übertragbarkeit:** ${x.uebertragbarkeit}`, '');
+          if (x.operation) {
+            L.push('**Operationskarte:**');
+            ['ausloeser', 'handgriff', 'abbruchbedingung', 'falsifikation', 'gegenbeispiel'].forEach(k => {
+              const f = x.operation[k];
+              if (f && (f.text || f.luecke)) L.push(`- ${k}: ${f.text || '(nicht belegt' + (f.luecke ? ': ' + f.luecke : '') + ')'}`);
+            });
+            if (x.operation.naechster_test) L.push(`- Nächster Test: ${x.operation.naechster_test}`);
+            L.push('');
+          }
+        });
+        if (data.patterns.zu_wenig_belegt && data.patterns.zu_wenig_belegt.length) {
+          L.push('### Zu wenig belegt', '');
+          data.patterns.zu_wenig_belegt.forEach(x => L.push('- ' + x));
+          L.push('');
+        }
+        if (data.patterns.nicht_beantwortbar && data.patterns.nicht_beantwortbar.length) {
+          L.push('### Nicht beantwortbar', '');
+          data.patterns.nicht_beantwortbar.forEach(x => L.push('- ' + x));
+          L.push('');
+        }
+      }
+      if (data.spannungen && data.spannungen.items && data.spannungen.items.length) {
+        L.push('## Spannungen zwischen Antworten', '');
+        data.spannungen.items.forEach(x => {
+          L.push(`- ${x.worin || '?'}`);
+          if (x.zitat_a) L.push(`  - „${x.zitat_a}“ (${x.moment_a || ''})`);
+          if (x.zitat_b) L.push(`  - „${x.zitat_b}“ (${x.moment_b || ''})`);
+        });
+        L.push('');
+      }
+      if (data.claims && data.claims.length) {
+        L.push('## Behauptungs-Ledger', '');
+        data.claims.forEach(c => {
+          L.push(`### ${c.text || '(leer)'}`, '');
+          L.push(`- Status: ${c.status || '–'}, zuletzt geprüft: ${c.checked || 'nie'}`);
+          L.push(`- Gegenbelege: ${c.counter || '–'}`, '');
+        });
+      }
+      if (data.whatbin) {
+        L.push('## Was bin ich?', '');
+        if (data.whatbin.verhaltensbeschreibung) L.push(data.whatbin.verhaltensbeschreibung, '');
+        (data.whatbin.begriffe || []).forEach(b => {
+          L.push(`### ${b.begriff}: ${b.urteil}`, '', b.begruendung || '', '');
+        });
+      }
+      return L.join('\n');
+    }
+
+    function renderGenesisPreview() {
+      const el = document.getElementById('genesis-preview');
+      const meta = document.getElementById('genesis-preview-meta');
+      if (!genesisImport) {
+        el.innerHTML = '<p class="text-slate-600 italic">Noch kein Genesis-Ergebnis geladen.</p>';
+        meta.textContent = '';
+        return;
+      }
+      meta.textContent = genesisImport.type === 'json'
+        ? `JSON · ${genesisImport.meta.patterns} Muster · ${genesisImport.meta.ops || 0} Ops · ${genesisImport.meta.claims || 0} Behauptungen · ${genesisImport.meta.spann || 0} Spannungen`
+        : `Markdown · ${genesisImport.markdown.length} Zeichen`;
+
+      let html = '';
+      if (genesisImport.type === 'json' && genesisImport.data) {
+        const d = genesisImport.data;
+        if (d.patterns && d.patterns.muster && d.patterns.muster.length) {
+          html += '<div class="space-y-2"><div class="text-xs font-semibold text-teal-300">Muster</div>';
+          d.patterns.muster.forEach((m, i) => {
+            const hasOp = !!m.operation;
+            html += `<div class="bg-slate-950 border border-slate-800 rounded-lg p-3">
+              <div class="font-medium text-slate-200">${escapeHtml(m.titel || 'Muster ' + (i + 1))} <span class="text-[10px] text-slate-500">(${escapeHtml(String(m.sicherheit || '?'))})${hasOp ? ' · Ops' : ''}</span></div>
+              <p class="text-[11px] text-slate-400 mt-1">${escapeHtml((m.beobachtung || '').slice(0, 280))}${(m.beobachtung || '').length > 280 ? '…' : ''}</p>
+              ${m.moegliche_gefahr ? `<p class="text-[11px] text-amber-400/90 mt-1">⚠ ${escapeHtml(m.moegliche_gefahr.slice(0, 160))}</p>` : ''}
+              ${hasOp && m.operation.handgriff && m.operation.handgriff.text ? `<p class="text-[11px] text-teal-400/80 mt-1">Handgriff: ${escapeHtml(m.operation.handgriff.text.slice(0, 140))}</p>` : ''}
+            </div>`;
+          });
+          html += '</div>';
+        }
+        if (d.claims && d.claims.length) {
+          html += `<div class="mt-3 space-y-1"><div class="text-xs font-semibold text-teal-300">Behauptungs-Ledger (${d.claims.length})</div>`;
+          d.claims.slice(0, 6).forEach(c => {
+            html += `<div class="bg-slate-950 border border-slate-800 rounded-lg p-2 text-[11px]"><span class="text-slate-200">${escapeHtml((c.text || '').slice(0, 120))}</span> <span class="text-slate-500">· ${escapeHtml(c.status || '?')}</span></div>`;
+          });
+          html += '</div>';
+        }
+        if (d.spannungen && d.spannungen.items && d.spannungen.items.length) {
+          html += `<div class="mt-3"><div class="text-xs font-semibold text-teal-300">Spannungen (${d.spannungen.items.length})</div><ul class="list-disc list-inside text-[11px] text-slate-400">${d.spannungen.items.slice(0, 5).map(x => `<li>${escapeHtml(x.worin || '')}</li>`).join('')}</ul></div>`;
+        }
+        if (d.whatbin) {
+          html += `<div class="mt-3 space-y-1"><div class="text-xs font-semibold text-teal-300">Was bin ich?</div>
+            <p class="text-[11px] text-slate-400">${escapeHtml((d.whatbin.verhaltensbeschreibung || '').slice(0, 400))}</p></div>`;
+        }
+        const gaps = [
+          ...(d.patterns && d.patterns.nicht_beantwortbar ? d.patterns.nicht_beantwortbar : []),
+          ...(d.whatbin && d.whatbin.nicht_beantwortbar ? d.whatbin.nicht_beantwortbar : [])
+        ];
+        if (gaps.length) {
+          html += `<div class="mt-3"><div class="text-xs font-semibold text-teal-300">Offene Fragen / Lücken</div><ul class="list-disc list-inside text-[11px] text-slate-400">${gaps.slice(0, 8).map(g => `<li>${escapeHtml(g)}</li>`).join('')}</ul></div>`;
+        }
+        if (!html) html = '<p class="text-slate-500">Projekt geladen, aber noch keine Muster/Ergebnisse vorhanden. In Genesis erst Analyse + Interview abschließen.</p>';
+      } else {
+        html = `<pre class="text-[11px] font-mono text-slate-400 whitespace-pre-wrap">${escapeHtml(genesisImport.markdown.slice(0, 6000))}${genesisImport.markdown.length > 6000 ? '\n…' : ''}</pre>`;
+      }
+      el.innerHTML = html;
+    }
+
+    function importGenesisToContext() {
+      if (!genesisImport) { alert('Zuerst ein Genesis-Ergebnis importieren.'); return; }
+      const ts = new Date().toLocaleDateString('de-DE');
+      let added = 0;
+
+      if (document.getElementById('gen-imp-fullmd')?.checked) {
+        addContextEntry(`Genesis Gesamt ${ts}`, genesisImport.markdown.slice(0, 12000));
+        added++;
+      }
+
+      if (genesisImport.type === 'json' && genesisImport.data) {
+        const d = genesisImport.data;
+        if (document.getElementById('gen-imp-patterns')?.checked && d.patterns && d.patterns.muster) {
+          d.patterns.muster.forEach((m, i) => {
+            const text = [
+              m.beobachtung ? `Beobachtung: ${m.beobachtung}` : '',
+              m.belege && m.belege.length ? 'Belege:\n' + m.belege.map(b => '- ' + b).join('\n') : '',
+              m.gegenbelege && m.gegenbelege.length ? 'Gegenbelege:\n' + m.gegenbelege.map(b => '- ' + b).join('\n') : '',
+              m.moegliche_gefahr ? `Gefahr: ${m.moegliche_gefahr}` : '',
+              m.eigene_erklaerung ? `Eigene Erklärung: ${m.eigene_erklaerung}` : '',
+              m.uebertragbarkeit ? `Übertragbarkeit: ${m.uebertragbarkeit}` : ''
+            ].filter(Boolean).join('\n\n');
+            if (text) {
+              addContextEntry(`Genesis Muster: ${m.titel || (i + 1)} (${ts})`, text);
+              added++;
+            }
+          });
+        }
+        if (document.getElementById('gen-imp-ops')?.checked && d.patterns && d.patterns.muster) {
+          d.patterns.muster.forEach((m) => {
+            if (!m.operation) return;
+            const o = m.operation;
+            const lines = [`Operationskarte zu Muster: ${m.titel || '?'}`];
+            ['ausloeser', 'handgriff', 'abbruchbedingung', 'falsifikation', 'gegenbeispiel'].forEach(k => {
+              const f = o[k];
+              if (f && (f.text || f.luecke)) lines.push(`${k}: ${f.text || '(nicht belegt' + (f.luecke ? ': ' + f.luecke : '') + ')'}`);
+            });
+            if (o.naechster_test) lines.push(`Nächster Test: ${o.naechster_test}`);
+            if (lines.length > 1) {
+              addContextEntry(`Genesis Ops: ${m.titel || '?'} (${ts})`, lines.join('\n'));
+              added++;
+            }
+          });
+        }
+        if (document.getElementById('gen-imp-claims')?.checked && d.claims && d.claims.length) {
+          const body = d.claims.map(c =>
+            `### ${c.text || '(leer)'}\nStatus: ${c.status || '–'} · geprüft: ${c.checked || 'nie'}\nGegenbelege: ${c.counter || '–'}`
+          ).join('\n\n');
+          addContextEntry(`Genesis Behauptungs-Ledger (${ts})`, body.slice(0, 10000));
+          added++;
+        }
+        if (document.getElementById('gen-imp-spannungen')?.checked && d.spannungen && d.spannungen.items && d.spannungen.items.length) {
+          const body = d.spannungen.items.map(x =>
+            `- ${x.worin || '?'}\n  „${x.zitat_a || ''}“ (${x.moment_a || ''})\n  „${x.zitat_b || ''}“ (${x.moment_b || ''})`
+          ).join('\n');
+          addContextEntry(`Genesis Spannungen (${ts})`, body);
+          added++;
+        }
+        if (document.getElementById('gen-imp-whatbin')?.checked && d.whatbin) {
+          let t = d.whatbin.verhaltensbeschreibung || '';
+          (d.whatbin.begriffe || []).forEach(b => {
+            t += `\n\n### ${b.begriff}: ${b.urteil}\n${b.begruendung || ''}`;
+          });
+          if (t.trim()) {
+            addContextEntry(`Genesis: Was bin ich? (${ts})`, t.trim());
+            added++;
+          }
+        }
+        if (document.getElementById('gen-imp-gaps')?.checked) {
+          const gaps = [
+            ...(d.patterns && d.patterns.nicht_beantwortbar ? d.patterns.nicht_beantwortbar : []),
+            ...(d.patterns && d.patterns.zu_wenig_belegt ? d.patterns.zu_wenig_belegt.map(x => 'Zu wenig belegt: ' + x) : []),
+            ...(d.whatbin && d.whatbin.nicht_beantwortbar ? d.whatbin.nicht_beantwortbar : [])
+          ];
+          if (gaps.length) {
+            addContextEntry(`Genesis Lücken (${ts})`, gaps.map(g => '- ' + g).join('\n'));
+            added++;
+          }
+        }
+        if (document.getElementById('gen-imp-moments')?.checked) {
+          const parts = [];
+          (d.phases || []).forEach(p => {
+            (p.result && p.result.momente || []).forEach(m => {
+              const answers = m.answers ? Object.entries(m.answers).filter(([, v]) => String(v || '').trim()).map(([k, v]) => `${k}: ${v}`).join('\n') : '';
+              parts.push(`### ${m.titel || 'Moment'} (${m.datum || ''})\n${m.beobachtung || ''}\n${answers}`);
+            });
+          });
+          if (parts.length) {
+            addContextEntry(`Genesis Interview-Momente (${ts})`, parts.join('\n\n').slice(0, 10000));
+            added++;
+          }
+        }
+      } else if (genesisImport.type === 'md') {
+        // Markdown-only: always add as context if nothing else selected or fullmd not checked
+        if (!document.getElementById('gen-imp-fullmd')?.checked) {
+          addContextEntry(`Genesis Markdown (${ts})`, genesisImport.markdown.slice(0, 12000));
+          added++;
+        }
+      }
+
+      if (added === 0) {
+        alert('Nichts ausgewählt oder keine passenden Daten im Import.');
+        return;
+      }
+      showToast(`${added} Kontext-Eintrag/Einträge aus Genesis`);
+      switchTab('context');
+    }
+
+    function sendGenesisToSession() {
+      if (!genesisImport) { alert('Zuerst importieren.'); return; }
+      let log = '';
+      if (genesisImport.type === 'json' && genesisImport.data) {
+        const d = genesisImport.data;
+        log = '# Genesis → Session-Analyse\n\n';
+        if (d.patterns && d.patterns.muster) {
+          log += '## Muster / wiederkehrende Fehler\n';
+          d.patterns.muster.forEach(m => {
+            log += `\n### ${m.titel}\n${m.beobachtung || ''}\nGefahr: ${m.moegliche_gefahr || '–'}\n`;
+          });
+        }
+        (d.phases || []).forEach(p => {
+          (p.result && p.result.momente || []).forEach(m => {
+            log += `\n## Moment: ${m.titel}\n${m.beobachtung || ''}\n`;
+            if (m.answers) Object.entries(m.answers).forEach(([k, v]) => { if (String(v || '').trim()) log += `${k}: ${v}\n`; });
+          });
+        });
+      } else {
+        log = genesisImport.markdown;
+      }
+      document.getElementById('session-log').value = log.slice(0, 50000);
+      document.getElementById('session-focus').value = 'Genesis-Rekonstruktion: wiederkehrende Fehler und vergessene Disziplin';
+      switchTab('session');
+      showToast('Genesis-Inhalt in Session-Analyse geladen');
+    }
+
+    function sendGenesisToPlan() {
+      if (!genesisImport) { alert('Zuerst importieren.'); return; }
+      const md = genesisImport.markdown || '';
+      planFiles = [];
+      pushPlanFile('genesis-import.md', md, 'genesis');
+      renderPlanFileList();
+      const goalEl = document.getElementById('plan-goal');
+      if (goalEl && !goalEl.value.trim()) {
+        goalEl.value = 'Auf Basis der Genesis-Rekonstruktion: nächste sinnvolle Entwicklungsschritte planen, bekannte Fehlmuster vermeiden, Lücken schließen.';
+      }
+      switchTab('plan');
+      showToast('Genesis-Material in Plan-Modus geladen');
+    }
+
+    function suggestClaudeRulesFromGenesis() {
+      if (!genesisImport) { alert('Zuerst importieren.'); return; }
+      const rules = [];
+      const dangerWords = /test|mock|sed|refactor|scope|demo|fake|secret|\.env|behaupt|verify|exit.?code|git/i;
+
+      if (genesisImport.type === 'json' && genesisImport.data && genesisImport.data.patterns) {
+        (genesisImport.data.patterns.muster || []).forEach(m => {
+          const blob = [m.titel, m.beobachtung, m.moegliche_gefahr, m.eigene_erklaerung].join(' ');
+          if (dangerWords.test(blob)) {
+            rules.push(`- Aus Genesis-Muster „${m.titel || '?'}“: ${ (m.moegliche_gefahr || m.beobachtung || '').slice(0, 200) }`);
+          }
+        });
+      }
+      // Always suggest core hardening tied to genesis themes
+      rules.push('- Genesis: Bei wiederkehrenden Mustern zuerst Beleg prüfen, nicht nur neue Features bauen.');
+      rules.push('- Genesis: Phasen mit dünner Quellenlage nicht als gesicherte Historie behandeln.');
+
+      let out = `# Vorgeschlagene Ergänzungen für CLAUDE.md (aus Genesis)\n\n## Zusätzliche Regeln\n${rules.join('\n')}\n\n## Hinweis\nDiese Vorschläge stammen aus importierten Genesis-Mustern. Vor dem Einfügen in CLAUDE.md prüfen und Human-in-the-Loop beachten.\n`;
+      document.getElementById('claude-md-raw').value = out;
+      document.getElementById('claude-md-output').innerText = out;
+      switchTab('claudemd');
+      showToast('Leitplanken-Vorschlag in CLAUDE.md-Tab');
+    }
+  </script>
+</body>
+</html>

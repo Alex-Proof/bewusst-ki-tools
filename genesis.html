@@ -1,0 +1,1562 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Genesis – Entwicklung rekonstruieren</title>
+<style>
+:root{
+  --bg:#E7EBEC; --surface:#F5F7F7; --surface2:#EBEFF0; --ink:#18262E; --ink2:#4A5C66; --line:#C3CED3;
+  --accent:#1D6A73; --accent-ink:#FFFFFF; --warn:#9A5B0C; --danger:#A23B3B; --ok:#2C7A4B;
+  --k-commit:#75608F; --k-code:#4C6E91; --k-text:#8DA37B; --k-chat:#C79E5E; --k-other:#A7B0B5;
+  --l-obs:#2F6B8A; --l-int:#A66A12; --l-val:#7C3A78;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#12181C; --surface:#1A2228; --surface2:#222C33; --ink:#E3E9EC; --ink2:#9DB0BA; --line:#33424C;
+    --accent:#5DB6BE; --accent-ink:#0B1519; --warn:#E0A24A; --danger:#E27A7A; --ok:#6CC28F;
+    --k-commit:#9985B5; --k-code:#6F93B8; --k-text:#A5BB93; --k-chat:#D8B274; --k-other:#6E7A82;
+    --l-obs:#6FB1D3; --l-int:#E0A24A; --l-val:#C97FC3;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:15.5px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:var(--serif);font-weight:600;line-height:1.2;margin:0 0 .5rem}
+h1{font-size:1.9rem;letter-spacing:-.01em}
+h2{font-size:1.3rem}
+h3{font-size:1.05rem}
+p{margin:.35rem 0 .8rem}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button,input,select,textarea{font:inherit;color:inherit}
+.app{display:grid;grid-template-columns:260px 1fr;min-height:100%}
+.rail{position:sticky;top:0;height:100vh;padding:1.4rem 1rem;border-right:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;gap:1.2rem;overflow:auto}
+.brand .mark{font:600 1.7rem var(--serif);letter-spacing:-.02em;display:block}
+.brand .sub{color:var(--ink2);font-size:.85rem}
+.steps{list-style:none;margin:0;padding:0;position:relative}
+.steps::before{content:"";position:absolute;left:15px;top:14px;bottom:44px;width:2px;background:var(--line)}
+.steps li{position:relative}
+.steps button{all:unset;box-sizing:border-box;display:grid;grid-template-columns:32px 1fr;gap:.6rem;align-items:center;width:100%;padding:.45rem .2rem;cursor:pointer;border-radius:6px}
+.steps button:hover{background:var(--surface2)}
+.steps button:focus-visible{outline:2px solid var(--accent)}
+.steps .n{width:32px;height:32px;border-radius:50%;background:var(--surface);border:2px solid var(--line);display:grid;place-items:center;font-weight:600;font-size:.9rem;position:relative;z-index:1}
+.steps .t{font-weight:500}
+.steps .s{grid-column:2;font-size:.78rem;color:var(--ink2);margin-top:-.15rem}
+.steps button[aria-current="step"] .n{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.steps button[aria-current="step"] .t{font-weight:700}
+.steps button.done .n{border-color:var(--ok);color:var(--ok)}
+.steps button[aria-current="step"].done .n{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.rail-foot{margin-top:auto;display:flex;flex-direction:column;gap:.4rem}
+main{padding:2rem clamp(1rem,4vw,3rem) 4rem;max-width:1180px;width:100%;min-width:0}
+.view{display:none}
+.view.on{display:block}
+.lede{color:var(--ink2);max-width:68ch;font-family:var(--serif);font-size:1.08rem}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;padding:.5rem .95rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);cursor:pointer;text-decoration:none;font-weight:500;line-height:1.3}
+.btn:hover{border-color:var(--ink2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--danger);border-color:var(--danger)}
+.btn.small{padding:.25rem .6rem;font-size:.85rem}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.btn.dirty{border-color:var(--warn);color:var(--warn)}
+.actions{display:flex;flex-wrap:wrap;gap:.6rem;margin:1rem 0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem 1.1rem;margin:.8rem 0}
+.card.tight{padding:.7rem .9rem}
+.muted{color:var(--ink2)}
+.small{font-size:.85rem}
+.chip{display:inline-block;padding:.05rem .5rem;border:1px solid var(--line);border-radius:99px;font-size:.78rem;color:var(--ink2);background:var(--surface2);white-space:nowrap}
+.chip.warn{color:var(--warn);border-color:var(--warn)}
+.chip.ok{color:var(--ok);border-color:var(--ok)}
+.chip.bad{color:var(--danger);border-color:var(--danger)}
+.drop{border:2px dashed var(--line);border-radius:8px;padding:2.2rem 1.2rem;text-align:center;background:var(--surface);transition:border-color .15s,background .15s}
+.drop.over{border-color:var(--accent);background:var(--surface2)}
+.drop .big{font:600 1.3rem var(--serif);display:block;margin-bottom:.3rem}
+.drop .row{display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap;margin-top:.9rem}
+.progress{height:6px;background:var(--surface2);border-radius:4px;overflow:hidden;margin:.6rem 0}
+.progress>div{height:100%;width:0;background:var(--accent)}
+pre.code{background:var(--surface2);border:1px solid var(--line);padding:.7rem .9rem;border-radius:6px;overflow:auto;font:.85rem/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word}
+details{margin:.4rem 0}
+details>summary{cursor:pointer;font-weight:500}
+table{width:100%;border-collapse:collapse;font-size:.92rem}
+th,td{text-align:left;padding:.4rem .5rem;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600;color:var(--ink2);font-size:.82rem}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+input[type=text],input[type=password],input[type=number],select,textarea{width:100%;padding:.45rem .6rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);}
+textarea{min-height:7.5rem;resize:vertical;line-height:1.5}
+label.f{display:block;margin:.6rem 0 .2rem;font-weight:500;font-size:.9rem}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+.chartwrap{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:.8rem .8rem .5rem;overflow-x:auto}
+svg#chart{width:100%;min-width:680px;height:auto;display:block}
+.legend{display:flex;gap:1rem;flex-wrap:wrap;font-size:.85rem;color:var(--ink2);margin-top:.3rem}
+.legend i{display:inline-block;width:.8rem;height:.8rem;border-radius:2px;margin-right:.35rem;vertical-align:-.1rem}
+.k-commit{fill:var(--k-commit)}.k-code{fill:var(--k-code)}.k-text{fill:var(--k-text)}.k-chat{fill:var(--k-chat)}.k-other{fill:var(--k-other)}
+.bg-commit{background:var(--k-commit)}.bg-code{background:var(--k-code)}.bg-text{background:var(--k-text)}.bg-chat{background:var(--k-chat)}.bg-other{background:var(--k-other)}
+.gap-rect{fill:var(--warn);opacity:.13}
+.axis{stroke:var(--line);stroke-width:1}
+.tick{fill:var(--ink2);font:11px var(--sans)}
+.phase-line{stroke:var(--ink2);stroke-dasharray:3 4;stroke-width:1;opacity:.6}
+.layer{--c:var(--ink2);border-left:4px solid var(--c);padding:.45rem .8rem;margin:.55rem 0;background:color-mix(in srgb,var(--c) 8%,var(--surface))}
+.layer.obs{--c:var(--l-obs)}.layer.int{--c:var(--l-int)}.layer.val{--c:var(--l-val)}
+.layer .ltag{display:block;font-weight:700;font-size:.82rem;color:var(--c);margin-bottom:.1rem}
+.layer p{margin:.15rem 0}
+.layer .ans{margin-top:.4rem;padding-top:.4rem;border-top:1px dashed var(--line);white-space:pre-wrap}
+.phase-head{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;align-items:baseline}
+.err{color:var(--danger)}
+.interview{display:grid;grid-template-columns:290px 1fr;gap:1.2rem;align-items:start}
+.momlist{position:sticky;top:1rem;max-height:calc(100vh - 2rem);overflow:auto;display:flex;flex-direction:column;gap:.4rem}
+.mom{all:unset;box-sizing:border-box;cursor:pointer;display:block;width:100%;padding:.55rem .7rem;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.mom:hover{border-color:var(--ink2)}
+.mom[aria-current="true"]{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.mom .d,.mom .tt,.mom .small{display:block}
+.mom .d{font-size:.78rem;color:var(--ink2)}
+.mom .tt{font-weight:600;line-height:1.3}
+.tabs{display:flex;gap:.3rem;flex-wrap:wrap;border-bottom:1px solid var(--line);margin:1rem 0}
+.tabs button{all:unset;cursor:pointer;padding:.5rem .8rem;border-bottom:3px solid transparent;font-weight:500;color:var(--ink2)}
+.tabs button[aria-selected="true"]{border-bottom-color:var(--accent);color:var(--ink)}
+.tabs button:focus-visible{outline:2px solid var(--accent)}
+.methode{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.6rem;margin:.5rem 0}
+.methode div{background:var(--surface2);border-radius:6px;padding:.5rem .7rem;font-size:.92rem}
+.methode b{display:block;font-size:.78rem;color:var(--ink2);font-weight:600}
+.row{display:flex;gap:.6rem;flex-wrap:wrap;align-items:end;margin:.3rem 0}
+.inl{width:auto!important}
+input[type=date]{padding:.4rem .6rem;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.checks label{display:block;margin:.25rem 0}
+dialog{border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);padding:1.3rem;max-width:min(860px,94vw);width:100%}
+dialog::backdrop{background:rgba(10,16,20,.55)}
+dialog pre{max-height:38vh;overflow:auto;background:var(--surface2);padding:.6rem;border-radius:6px;white-space:pre-wrap;word-break:break-word;font:.8rem/1.45 ui-monospace,Menlo,Consolas,monospace}
+.toast{position:fixed;right:1rem;bottom:1rem;background:var(--ink);color:var(--bg);padding:.6rem .9rem;border-radius:6px;max-width:80ch;z-index:99;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.on{opacity:1}
+.empty{border:1px dashed var(--line);border-radius:6px;padding:1.4rem;text-align:center;color:var(--ink2)}
+.tl-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-top:1rem}
+.tl-cols ul{margin:.3rem 0;padding-left:1.1rem}
+.notice{border-left:4px solid var(--warn);background:color-mix(in srgb,var(--warn) 9%,var(--surface));padding:.55rem .8rem;margin:.6rem 0;border-radius:0 6px 6px 0}
+.notice.info{border-left-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--surface))}
+@media (max-width:900px){
+  .app{grid-template-columns:1fr}
+  .rail{position:static;height:auto;flex-direction:column;border-right:0;border-bottom:1px solid var(--line)}
+  .steps::before{display:none}
+  .steps{display:flex;flex-wrap:wrap;gap:.3rem}
+  .steps li{flex:1 1 140px}
+  .grid2,.grid3,.tl-cols,.interview{grid-template-columns:1fr}
+  .momlist{position:static;max-height:none}
+  .rail-foot{flex-direction:row;flex-wrap:wrap}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="rail" aria-label="Schritte">
+    <div class="brand"><span class="mark">Genesis</span><span class="sub">Entwicklung rekonstruieren</span></div>
+    <a href="https://bewusstki.de/werkzeuge.html" class="small muted" style="text-decoration:underline;display:block;margin:-.6rem 0 .8rem">↖ bewusst.ki Werkzeuge</a>
+    <ol class="steps" id="steps">
+      <li><button data-go="import"><span class="n">1</span><span class="t">Material einlesen</span><span class="s" data-s="import"></span></button></li>
+      <li><button data-go="timeline"><span class="n">2</span><span class="t">Zeitleiste</span><span class="s" data-s="timeline"></span></button></li>
+      <li><button data-go="analysis"><span class="n">3</span><span class="t">Analyse</span><span class="s" data-s="analysis"></span></button></li>
+      <li><button data-go="interview"><span class="n">4</span><span class="t">Interview</span><span class="s" data-s="interview"></span></button></li>
+      <li><button data-go="results"><span class="n">5</span><span class="t">Ergebnis</span><span class="s" data-s="results"></span></button></li>
+    </ol>
+    <div class="rail-foot">
+      <button class="btn ghost" id="btnSettings">Einstellungen</button>
+      <button class="btn ghost" id="saveBtn">Projekt sichern</button>
+      <label class="btn ghost" style="cursor:pointer">Projekt laden<input type="file" id="loadProj" accept=".json,application/json" hidden></label>
+      <p class="small muted" style="margin:.4rem 0 0">Nichts wird im Browser gespeichert. Sichere dein Projekt als Datei, bevor du das Fenster schließt.</p>
+    </div>
+  </nav>
+
+  <main>
+    <!-- 1 IMPORT -->
+    <section class="view on" id="view-import" aria-labelledby="h-import">
+      <h1 id="h-import">Material einlesen</h1>
+      <p class="lede">Ziehe Ordner oder Dateien hierher. Gelesen wird nur in diesem Fenster. Erst wenn du in Schritt 3 etwas analysieren lässt, geht Text an den KI-Anbieter, und vorher siehst du genau, was.</p>
+      <div class="drop" id="drop" tabindex="0">
+        <span class="big">Ordner oder Dateien hier ablegen</span>
+        <span class="muted">Code (ts, tsx, js, py, html, css …), Notizen (md, txt), Chat-Exporte (ChatGPT- oder Claude-<code>conversations.json</code>, Reddit-CSV), Git-Historie</span>
+        <div class="row">
+          <label class="btn primary" style="cursor:pointer">Ordner wählen<input type="file" id="pickDir" webkitdirectory multiple hidden></label>
+          <label class="btn" style="cursor:pointer">Dateien wählen<input type="file" id="pickFiles" multiple hidden></label>
+        </div>
+      </div>
+      <div class="progress" id="prog" hidden><div id="progBar"></div></div>
+      <p class="small muted" id="progText" hidden></p>
+
+      <details class="card">
+        <summary>Git-Historie für genaue Erstelldaten exportieren (empfohlen)</summary>
+        <p>Ein Browser sieht bei hochgeladenen Dateien nur das Änderungsdatum. Das kann täuschen, etwa nach dem Kopieren oder Entpacken. Die Git-Historie kennt den Zeitpunkt des ersten Commits jeder Datei. Bitte deinen Coding-Agenten, in jedem Projektordner diesen Befehl auszuführen, und ziehe die entstandene Datei zusammen mit deinem Material hierher:</p>
+        <pre class="code" id="gitCmd">git log --date=iso-strict --name-only --pretty=format:"COMMIT|%ad|%s" > git-log.txt</pre>
+        <button class="btn small" id="copyGit">Befehl kopieren</button>
+        <p class="small muted" style="margin-top:.6rem">Umbenennungen von Dateien erkennt der Export nicht. Diese Dateien fallen dann auf das Änderungsdatum zurück.</p>
+      </details>
+
+      <div id="importSummary"></div>
+      <div id="fileGroups"></div>
+      <div class="actions"><button class="btn primary" id="btnBuild" disabled>Zeitleiste berechnen</button></div>
+    </section>
+
+    <!-- 2 TIMELINE -->
+    <section class="view" id="view-timeline" aria-labelledby="h-timeline">
+      <h1 id="h-timeline">Zeitleiste</h1>
+      <p class="lede">Dieser Schritt kommt ohne KI aus. Jede Säule ist eine Woche. Brüche zeigen sich oft in der Dichte: plötzlich viel, dann Stille, dann ein einzelner großer Block.</p>
+      <div id="tlBody"></div>
+    </section>
+
+    <!-- 3 ANALYSIS -->
+    <section class="view" id="view-analysis" aria-labelledby="h-analysis">
+      <h1 id="h-analysis">Analyse pro Phase</h1>
+      <p class="lede">Die KI arbeitet hier als Archivar: Sie ordnet Belege, markiert Lücken und schlägt Momente für das Interview vor. Bewertungen bekommst du von ihr nur als Fragen.</p>
+      <div id="anBody"></div>
+    </section>
+
+    <!-- 4 INTERVIEW -->
+    <section class="view" id="view-interview" aria-labelledby="h-interview">
+      <h1 id="h-interview">Zeitreise-Interview</h1>
+      <p class="lede">Zu jedem Moment siehst du Belege aus der Zeit davor und danach. Antworte aus der Erinnerung an damals und überspringe, was du nicht weißt. Gefühle und Motive stehen nur im Ergebnis, wenn du sie selbst schreibst.</p>
+      <div id="ivBody"></div>
+    </section>
+
+    <!-- 5 RESULTS -->
+    <section class="view" id="view-results" aria-labelledby="h-results">
+      <h1 id="h-results">Ergebnis</h1>
+      <div id="resBody"></div>
+    </section>
+  </main>
+</div>
+
+<!-- Vorschau vor dem Senden -->
+<dialog id="dlgPreview" aria-labelledby="pvTitle">
+  <h2 id="pvTitle">Vorschau</h2>
+  <div id="pvSummary"></div>
+  <div id="pvList" style="margin-top:.6rem"></div>
+  <div class="actions" style="justify-content:flex-end">
+    <button class="btn" id="pvCancel">Abbrechen</button>
+    <button class="btn primary" id="pvSend">Senden</button>
+  </div>
+</dialog>
+
+<!-- Einstellungen -->
+<dialog id="dlgSettings" aria-labelledby="stTitle">
+  <h2 id="stTitle">Einstellungen</h2>
+  <div class="grid2">
+    <div>
+      <label class="f" for="stProvider">KI-Anbieter</label>
+      <select id="stProvider"></select>
+    </div>
+    <div>
+      <label class="f" for="stModel">Modellname</label>
+      <input type="text" id="stModel" autocomplete="off">
+    </div>
+  </div>
+  <label class="f" for="stUrl">Adresse der Schnittstelle</label>
+  <input type="text" id="stUrl" autocomplete="off">
+  <label class="f" for="stKey">API-Key</label>
+  <input type="password" id="stKey" autocomplete="off" placeholder="wird nur im Arbeitsspeicher gehalten">
+  <p class="small muted">Der Key verschwindet, sobald du das Fenster schließt oder neu lädst. Modellnamen sind Vorschläge und ändern sich beim Anbieter. Trage ein, was in deinem Konto verfügbar ist.</p>
+  <div class="grid2">
+    <div><label class="f" for="stPriceIn">Preis Eingabe, USD pro 1 Mio. Token</label><input type="number" id="stPriceIn" step="any" min="0" placeholder="selbst eintragen"></div>
+    <div><label class="f" for="stPriceOut">Preis Ausgabe, USD pro 1 Mio. Token</label><input type="number" id="stPriceOut" step="any" min="0" placeholder="selbst eintragen"></div>
+  </div>
+  <div class="grid2">
+    <div><label class="f" for="stWeeks">Wochen mit Aktivität pro Phase</label><input type="number" id="stWeeks" min="1" max="12"></div>
+    <div><label class="f" for="stChars">Maximale Zeichen Material pro Phase</label><input type="number" id="stChars" min="6000" max="120000" step="1000"></div>
+  </div>
+  <div class="actions" style="justify-content:flex-end">
+    <button class="btn primary" id="stClose">Übernehmen</button>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+/* ============ Hilfsfunktionen ============ */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad = n => String(n).padStart(2, '0');
+const isoDate = ts => { const d = new Date(ts); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
+const fmtDate = ts => new Date(ts).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit', year:'numeric'});
+const fmtShort = ts => new Date(ts).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'});
+const fmtSize = b => b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(0) + ' KB' : (b / 1048576).toFixed(1) + ' MB';
+const estTokens = chars => Math.ceil(chars / 3.5);
+const tick = () => new Promise(r => setTimeout(r, 0));
+const arr = x => Array.isArray(x) ? x.map(String) : (x ? [String(x)] : []);
+const str = x => (x == null ? '' : String(x));
+let toastTimer;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 4200); }
+function download(name, text, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'}));
+  a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function weekStart(ts) { const d = new Date(ts); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.getTime(); }
+function clip(t, head = 6000, tail = 2000) {
+  t = t.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n');
+  return t.length <= head + tail ? t : t.slice(0, head) + '\n[… gekürzt …]\n' + t.slice(-tail);
+}
+function snippet(t, n) {
+  if (!t) return '';
+  t = t.replace(/\n{3,}/g, '\n\n');
+  if (t.length <= n) return t;
+  const h = Math.floor(n * 0.7), e = Math.floor(n * 0.3);
+  return t.slice(0, h) + '\n[…]\n' + t.slice(-e);
+}
+function contentDates(t) {
+  const lo = Date.UTC(2020, 0, 1), hi = Date.now() + 366 * 864e5; let min = Infinity, max = -Infinity, m;
+  const r1 = /\b(20\d\d)-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])\b/g, r2 = /\b(0?[1-9]|[12]\d|3[01])\.(0?[1-9]|1[0-2])\.(20\d\d)\b/g;
+  const upd = (y, mo, d) => { const ts = Date.UTC(+y, +mo - 1, +d); if (ts >= lo && ts <= hi) { if (ts < min) min = ts; if (ts > max) max = ts; } };
+  let guard = 0;
+  while ((m = r1.exec(t)) && guard++ < 400) upd(m[1], m[2], m[3]);
+  while ((m = r2.exec(t)) && guard++ < 800) upd(m[3], m[2], m[1]);
+  return isFinite(min) ? [new Date(min).toISOString().slice(0, 10), new Date(max).toISOString().slice(0, 10)] : null;
+}
+let redactCount = 0;
+function redact(t) {
+  const pats = [
+    /\b(?:sk|pk|rk)-[A-Za-z0-9_\-]{16,}\b/g, /\bghp_[A-Za-z0-9]{20,}\b/g, /\bgithub_pat_[A-Za-z0-9_]{20,}\b/g,
+    /\bAKIA[0-9A-Z]{16}\b/g, /\bAIza[0-9A-Za-z_\-]{30,}\b/g, /\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\b/g,
+    /\b(api[_-]?key|secret|token|password|passwort|bearer)\b(\s*[:=]\s*)(['"]?)[^\s'",;]{8,}/gi
+  ];
+  let out = t;
+  pats.forEach((p, i) => { out = out.replace(p, (m, a, b, c) => { redactCount++; return i === pats.length - 1 ? `${a}${b}${c}[ENTFERNT]` : '[ENTFERNT]'; }); });
+  return out;
+}
+
+/* ============ Konstanten ============ */
+const PROVIDERS = {
+  deepseek: {label:'DeepSeek', url:'https://api.deepseek.com/chat/completions', model:'deepseek-chat', style:'openai'},
+  openai: {label:'OpenAI', url:'https://api.openai.com/v1/chat/completions', model:'gpt-4o-mini', style:'openai'},
+  anthropic: {label:'Anthropic', url:'https://api.anthropic.com/v1/messages', model:'claude-sonnet-5', style:'anthropic'},
+  custom: {label:'Eigener Anbieter (OpenAI-kompatibel)', url:'', model:'', style:'openai'}
+};
+const KINDS = {commit:'Commits', code:'Code', text:'Texte', chat:'Chats', other:'Sonstiges'};
+const KIND_ORDER = ['commit', 'code', 'text', 'chat', 'other'];
+const BASIS = {git:'erster Git-Commit', mtime:'Änderungsdatum der Datei', chat:'Zeitstempel im Chat-Export', commit:'Commit-Datum', csv:'Datumsspalte im Export'};
+const IGNORE_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', '.nuxt', '__pycache__', 'venv', '.venv', 'coverage', '.cache', '.turbo', '.idea', '.vscode']);
+const IGNORE_FILES = /^(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|\.DS_Store|Thumbs\.db)$/i;
+const SECRET_FILES = /^(\.env.*|id_rsa.*|id_ed25519.*|.*\.(pem|key|p12|pfx|keystore))$/i;
+const DOC_EXT = new Set(['md', 'markdown', 'txt', 'log', 'rst', 'org']);
+const CODE_EXT = new Set(['ts','tsx','js','jsx','mjs','cjs','py','css','scss','html','htm','vue','svelte','sh','bash','sql','yml','yaml','toml','rs','go','java','kt','c','cpp','h','php','rb']);
+const QUESTIONS = [
+  {id:'q_between', text:'Was ist zwischen dem Davor und dem Danach passiert?'},
+  {id:'q_feel', text:'Wie hast du dich dabei gefühlt, und was hat dich motiviert weiterzumachen?'},
+  {id:'q_belief', text:'Was hast du damals geglaubt, das du heute anders siehst?'},
+  {id:'q_change', text:'Welche Entscheidung würdest du heute anders treffen?'},
+  {id:'q_why', text:'Warum bist du trotzdem weitergegangen?'}
+];
+
+/* ============ Zustand ============ */
+const S = {
+  files: [], seq: 0, fileKeys: new Set(), ignored: {dirs: 0, secrets: 0}, errors: [],
+  gitFirst: new Map(), gitFiles: 0,
+  items: [], itemById: new Map(),
+  timeline: null, phases: [], patterns: null, whatbin: null,
+  sendLog: [], spannungen: null, openQState: {}, claims: [], compare: null, dirty: false, cancel: false, abort: null, busy: false,
+  settings: {provider:'deepseek', url:PROVIDERS.deepseek.url, model:PROVIDERS.deepseek.model, key:'', priceIn:'', priceOut:'', weeksPerPhase:4, charsPerPhase:24000},
+  ui: {view:'import', momentId:null, q:0, tab:'A', groupOpen:{}}
+};
+function markDirty() { S.dirty = true; $('#saveBtn').classList.add('dirty'); }
+window.addEventListener('beforeunload', e => { if (S.dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+/* ============ Navigation ============ */
+function go(view) {
+  S.ui.view = view;
+  $$('.view').forEach(v => v.classList.toggle('on', v.id === 'view-' + view));
+  renderRail();
+  ({import: renderImport, timeline: renderTimeline, analysis: renderAnalysis, interview: renderInterview, results: renderResults})[view]();
+  window.scrollTo(0, 0);
+}
+function renderRail() {
+  const doneMap = {
+    import: S.files.length > 0,
+    timeline: !!S.timeline,
+    analysis: S.phases.some(p => p.result),
+    interview: allMoments().some(m => momentAnswered(m) > 0),
+    results: !!S.patterns
+  };
+  const sub = {
+    import: S.files.length ? S.files.filter(f => f.included).length + ' Dateien aktiv' : 'noch leer',
+    timeline: S.timeline ? S.timeline.weeks.length + ' Wochen' : 'nicht berechnet',
+    analysis: S.phases.length ? S.phases.filter(p => p.result).length + ' von ' + S.phases.length + ' Phasen' : '–',
+    interview: allMoments().length ? allMoments().filter(m => momentAnswered(m) > 0).length + ' von ' + allMoments().length + ' Momenten' : '–',
+    results: S.patterns ? 'Muster vorhanden' : '–'
+  };
+  $$('#steps button').forEach(b => {
+    const k = b.dataset.go;
+    b.classList.toggle('done', !!doneMap[k]);
+    if (S.ui.view === k) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current');
+    $('[data-s]', b).textContent = sub[k];
+  });
+}
+
+/* ============ Schritt 1: Import ============ */
+function isIgnoredPath(path) {
+  const segs = path.split('/'), name = segs[segs.length - 1];
+  return segs.slice(0, -1).some(s => IGNORE_DIRS.has(s)) || IGNORE_FILES.test(name);
+}
+async function collectFromDataTransfer(dt) {
+  const entries = [];
+  for (const it of dt.items) { const e = it.webkitGetAsEntry && it.webkitGetAsEntry(); if (e) entries.push(e); }
+  const out = [];
+  async function walk(e, prefix) {
+    if (e.isFile) {
+      const f = await new Promise((res, rej) => e.file(res, rej));
+      out.push({file: f, path: prefix + e.name});
+    } else if (e.isDirectory) {
+      if (IGNORE_DIRS.has(e.name)) { S.ignored.dirs++; return; }
+      const r = e.createReader(); let batch;
+      do {
+        batch = await new Promise((res, rej) => r.readEntries(res, rej));
+        for (const c of batch) await walk(c, prefix + e.name + '/');
+      } while (batch.length);
+    }
+  }
+  for (const e of entries) await walk(e, '');
+  if (!entries.length && dt.files && dt.files.length) return [...dt.files].map(f => ({file:f, path:f.name}));
+  return out;
+}
+async function ingest(entries) {
+  const prog = $('#prog'), bar = $('#progBar'), txt = $('#progText');
+  prog.hidden = false; txt.hidden = false;
+  let n = 0; const total = entries.length;
+  for (const {file, path} of entries) {
+    n++;
+    if (n % 15 === 0) { bar.style.width = (n / total * 100) + '%'; txt.textContent = n + ' von ' + total + ' Dateien gelesen'; await tick(); }
+    try { await ingestOne(file, path); } catch (e) { S.errors.push(path + ': ' + e.message); }
+  }
+  prog.hidden = true; txt.hidden = true; bar.style.width = '0';
+  markDirty(); renderImport(); renderRail();
+}
+async function ingestOne(file, path) {
+  const segs = path.split('/'), name = segs[segs.length - 1];
+  if (isIgnoredPath(path)) { S.ignored.dirs++; return; }
+  if (SECRET_FILES.test(name)) { S.ignored.secrets++; return; }
+  const key = path + '|' + file.size + '|' + file.lastModified;
+  if (S.fileKeys.has(key)) return;
+  S.fileKeys.add(key);
+  const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
+  const rec = {id:'f' + (S.seq++), name, path, ext, size:file.size, mtime:file.lastModified, kind:'other', text:'', included:true, note:'', special:null};
+  if ((ext === 'txt' || ext === 'log') && file.size > 0) {
+    const head = await file.slice(0, 300).text();
+    if (/^\s*COMMIT\|/.test(head)) { parseGitLog(await file.text(), rec); S.files.push(rec); return; }
+  }
+  if (ext === 'json' && file.size <= 200 * 1048576 && /conversations|chat|export|messages/i.test(name)) {
+    const chats = tryChat(await file.text());
+    if (chats) { rec.special = 'chat'; rec.kind = 'chat'; rec.chats = chats; rec.note = chats.length + ' Gespräche'; S.files.push(rec); return; }
+  }
+  if (ext === 'csv' && file.size <= 50 * 1048576) {
+    const chats = tryRedditCsv(await file.text());
+    if (chats) { rec.special = 'csv'; rec.kind = 'chat'; rec.chats = chats; rec.note = chats.length + ' Tage mit Beiträgen'; S.files.push(rec); return; }
+  }
+  if (DOC_EXT.has(ext) || CODE_EXT.has(ext)) {
+    rec.kind = DOC_EXT.has(ext) ? 'text' : 'code';
+    if (file.size <= 3 * 1048576) {
+      const t = await file.text();
+      rec.cd = contentDates(t); rec.len = t.length; rec.text = clip(t);
+    } else rec.note = 'zu groß, Inhalt nicht gelesen';
+  }
+  S.files.push(rec);
+}
+function parseGitLog(text, rec) {
+  const commits = []; let cur = null;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trimEnd();
+    if (line.startsWith('COMMIT|')) {
+      const rest = line.slice(7), i = rest.indexOf('|');
+      const date = Date.parse(rest.slice(0, i));
+      cur = {date: isFinite(date) ? date : null, subject: rest.slice(i + 1) || '(ohne Text)', files: []};
+      if (cur.date) commits.push(cur); else cur = null;
+    } else if (line && cur) {
+      cur.files.push(line);
+      const prev = S.gitFirst.get(line);
+      if (prev === undefined) S.gitFiles++;
+      if (prev === undefined || cur.date < prev) S.gitFirst.set(line, cur.date);
+    }
+  }
+  rec.special = 'git'; rec.kind = 'commit'; rec.commits = commits; rec.note = commits.length + ' Commits';
+}
+function firstCommitFor(path) {
+  if (!S.gitFirst.size) return null;
+  const segs = path.split('/');
+  for (const cand of [path, segs.slice(1).join('/')]) { if (cand && S.gitFirst.has(cand)) return S.gitFirst.get(cand); }
+  return null;
+}
+function clipChat(t) { return clip(t, 5000, 3000); }
+function tryChat(text) {
+  let json; try { json = JSON.parse(text); } catch { return null; }
+  const list = Array.isArray(json) ? json : (json && json.conversations) || [];
+  const out = [];
+  for (const c of list) {
+    if (!c || typeof c !== 'object') continue;
+    if (c.mapping) {
+      const msgs = [];
+      for (const k in c.mapping) {
+        const m = c.mapping[k] && c.mapping[k].message;
+        if (m && m.content && Array.isArray(m.content.parts)) {
+          const t = m.content.parts.filter(p => typeof p === 'string').join('\n');
+          if (t.trim() && m.author && m.author.role !== 'system') msgs.push({t: m.create_time ? m.create_time * 1000 : 0, role: m.author.role, text: t});
+        }
+      }
+      msgs.sort((a, b) => a.t - b.t);
+      const date = c.create_time ? c.create_time * 1000 : (msgs[0] && msgs[0].t) || null;
+      if (date && msgs.length) out.push({title: c.title || 'Chat', date, text: clipChat(msgs.map(m => (m.role === 'user' ? 'ICH: ' : 'KI: ') + m.text).join('\n'))});
+    } else if (Array.isArray(c.chat_messages)) {
+      const date = Date.parse(c.created_at || (c.chat_messages[0] && c.chat_messages[0].created_at));
+      const t = c.chat_messages.map(m => (m.sender === 'human' ? 'ICH: ' : 'KI: ') + (m.text || (Array.isArray(m.content) ? m.content.map(x => x.text || '').join('') : ''))).join('\n');
+      if (isFinite(date)) out.push({title: c.name || 'Chat', date, text: clipChat(t)});
+    }
+  }
+  return out.length ? out : null;
+}
+function parseCsv(t) {
+  const rows = []; let row = [], cur = '', q = false;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (q) { if (c === '"') { if (t[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+    else if (c === '"') q = true;
+    else if (c === ',') { row.push(cur); cur = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && t[i + 1] === '\n') i++; row.push(cur); cur = ''; rows.push(row); row = []; }
+    else cur += c;
+  }
+  if (cur || row.length) { row.push(cur); rows.push(row); }
+  return rows;
+}
+function tryRedditCsv(text) {
+  const rows = parseCsv(text); if (rows.length < 2) return null;
+  const head = rows[0].map(h => h.trim().toLowerCase());
+  const di = head.indexOf('date'); const bi = ['body', 'content', 'text', 'title'].map(k => head.indexOf(k)).find(i => i >= 0);
+  if (di < 0 || bi === undefined) return null;
+  const byDay = new Map();
+  for (const r of rows.slice(1)) {
+    const ts = Date.parse((r[di] || '').replace(' UTC', 'Z').replace(' ', 'T'));
+    if (!isFinite(ts) || !r[bi]) continue;
+    const k = isoDate(ts); if (!byDay.has(k)) byDay.set(k, {date: ts, parts: []});
+    byDay.get(k).parts.push(r[bi]);
+  }
+  const out = [...byDay.entries()].map(([k, v]) => ({title: k + ' (' + v.parts.length + ' Beiträge)', date: v.date, text: clipChat(v.parts.join('\n---\n'))}));
+  return out.length ? out : null;
+}
+function groupKey(f) { const dir = f.path.split('/').slice(0, -1); return dir.slice(0, 2).join('/') || '(oberste Ebene)'; }
+function renderImport() {
+  const files = S.files, inc = files.filter(f => f.included);
+  const btn = $('#btnBuild'); btn.disabled = !inc.length;
+  btn.textContent = S.timeline ? 'Zeitleiste neu berechnen' : 'Zeitleiste berechnen';
+  if (!files.length) { $('#importSummary').innerHTML = ''; $('#fileGroups').innerHTML = ''; return; }
+  const cnt = {}; inc.forEach(f => { const n = f.special ? (f.commits ? f.commits.length : f.chats.length) : 1; cnt[f.kind] = (cnt[f.kind] || 0) + n; });
+  const gitN = inc.filter(f => !f.special && firstCommitFor(f.path)).length;
+  const nonSpecial = inc.filter(f => !f.special).length;
+  let html = '<div class="card"><h2>Eingelesen</h2><p>' + KIND_ORDER.filter(k => cnt[k]).map(k => `<span class="chip">${KINDS[k]}: ${cnt[k]}</span>`).join(' ') + '</p>';
+  if (S.gitFirst.size) html += `<p class="small muted">Erstelldatum aus Git für ${gitN} von ${nonSpecial} Dateien. Für die übrigen gilt das Änderungsdatum.</p>`;
+  else html += '<p class="small muted">Ohne Git-Historie gilt für alle Dateien das Änderungsdatum. Das kann verfälscht sein.</p>';
+  if (S.ignored.dirs || S.ignored.secrets) html += `<p class="small muted">Automatisch übersprungen: ${S.ignored.dirs} Dateien oder Ordner aus Systemordnern (node_modules, .git, dist …)${S.ignored.secrets ? `, ${S.ignored.secrets} Schlüssel- und .env-Dateien (nie gelesen)` : ''}.</p>`;
+  if (S.errors.length) html += `<p class="small err">${S.errors.length} Dateien konnten nicht gelesen werden.</p>`;
+  html += '</div>';
+  $('#importSummary').innerHTML = html;
+
+  const groups = new Map();
+  files.forEach(f => { const k = groupKey(f); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(f); });
+  let rows = '';
+  [...groups.entries()].sort((a, b) => b[1].length - a[1].length).forEach(([k, fs], i) => {
+    const on = fs.filter(f => f.included).length;
+    const kinds = [...new Set(fs.map(f => KINDS[f.kind]))].join(', ');
+    const dates = fs.map(f => f.mtime).sort((a, b) => a - b);
+    rows += `<tr><td><input type="checkbox" data-group="${esc(k)}" ${on === fs.length ? 'checked' : ''} aria-label="${esc(k)} einbeziehen"></td><td>${esc(k)}</td><td class="num">${on}/${fs.length}</td><td>${esc(kinds)}</td><td class="muted">${fmtDate(dates[0])} bis ${fmtDate(dates[dates.length - 1])}</td></tr>`;
+  });
+  $('#fileGroups').innerHTML = `<div class="card"><h2>Was soll dabei sein?</h2>
+    <p class="small muted">Nimm heraus, was nicht zur Analyse gehört. Reddit-Chats etwa kannst du hier ganz ausschließen.</p>
+    <table><thead><tr><th></th><th>Ordner</th><th class="num">aktiv</th><th>Arten</th><th>Änderungsdaten</th></tr></thead><tbody>${rows}</tbody></table>
+    <label class="f" for="searchPath">Nach Pfad oder Name suchen</label>
+    <input type="text" id="searchPath" placeholder="z. B. reddit">
+    <div id="searchOut"></div></div>`;
+  $$('#fileGroups [data-group]').forEach(cb => cb.addEventListener('change', () => {
+    groups.get(cb.dataset.group).forEach(f => f.included = cb.checked); markDirty(); renderImport(); renderRail();
+  }));
+  $('#searchPath').addEventListener('input', renderSearch);
+}
+function renderSearch() {
+  const q = $('#searchPath').value.trim().toLowerCase(), out = $('#searchOut');
+  if (!q) { out.innerHTML = ''; return; }
+  const hits = S.files.filter(f => f.path.toLowerCase().includes(q));
+  out.innerHTML = `<p class="small">${hits.length} Treffer <button class="btn small" id="hitOff">Alle ausschließen</button> <button class="btn small" id="hitOn">Alle einbeziehen</button></p>
+    <table><tbody>${hits.slice(0, 40).map(f => `<tr><td><input type="checkbox" data-file="${f.id}" ${f.included ? 'checked' : ''} aria-label="${esc(f.path)}"></td><td>${esc(f.path)}</td><td class="muted num">${fmtSize(f.size)}</td></tr>`).join('')}</tbody></table>${hits.length > 40 ? '<p class="small muted">Es werden nur die ersten 40 Treffer einzeln gezeigt.</p>' : ''}`;
+  $('#hitOff').onclick = () => { hits.forEach(f => f.included = false); markDirty(); renderImport(); $('#searchPath').value = q; renderSearch(); };
+  $('#hitOn').onclick = () => { hits.forEach(f => f.included = true); markDirty(); renderImport(); $('#searchPath').value = q; renderSearch(); };
+  $$('#searchOut [data-file]').forEach(cb => cb.addEventListener('change', () => { S.files.find(f => f.id === cb.dataset.file).included = cb.checked; markDirty(); }));
+}
+
+/* ============ Schritt 2: Zeitleiste ============ */
+function buildItems() {
+  S.items = []; let seq = 0;
+  const add = o => { o.id = 'i' + (seq++); S.items.push(o); };
+  for (const f of S.files) {
+    if (!f.included) continue;
+    if (f.special === 'git') {
+      for (const c of f.commits) add({type:'commit', kind:'commit', path:'Commit: ' + c.subject.slice(0, 120), date:c.date, basis:'commit', size:0,
+        text: c.subject + (c.files.length ? '\nDateien: ' + c.files.slice(0, 15).join(', ') + (c.files.length > 15 ? ` … (+${c.files.length - 15})` : '') : '')});
+    } else if (f.special === 'chat' || f.special === 'csv') {
+      for (const c of f.chats) add({type:'chat', kind:'chat', path:f.name + ' › ' + c.title, date:c.date, basis:f.special === 'csv' ? 'csv' : 'chat', size:c.text.length, text:c.text});
+    } else {
+      const first = firstCommitFor(f.path);
+      add({type:'file', kind:f.kind, path:f.path, date:first || f.mtime, basis:first ? 'git' : 'mtime', size:f.size, text:f.text, cd:f.cd || null});
+    }
+  }
+  S.itemById = new Map(S.items.map(i => [i.id, i]));
+}
+function computeTimeline() {
+  const minOk = Date.UTC(2015, 0, 1), maxOk = Date.now() + 2 * 864e5;
+  const dated = S.items.filter(i => i.date && i.date >= minOk && i.date <= maxOk);
+  const undated = S.items.length - dated.length;
+  if (!dated.length) { S.timeline = null; S.phases = []; return false; }
+  const byWeek = new Map(); let min = Infinity, max = -Infinity;
+  for (const it of dated) {
+    const w = weekStart(it.date); it.week = w; if (w < min) min = w; if (w > max) max = w;
+    const k = isoDate(w); if (!byWeek.has(k)) byWeek.set(k, []); byWeek.get(k).push(it);
+  }
+  const weeks = [];
+  for (let t = min; t <= max;) {
+    const its = byWeek.get(isoDate(t)) || [], counts = {commit:0, code:0, text:0, chat:0, other:0};
+    its.forEach(i => counts[i.kind]++);
+    weeks.push({start:t, counts, total:its.length});
+    const d = new Date(t); d.setDate(d.getDate() + 7); t = d.getTime();
+  }
+  S.byWeek = byWeek;
+  const gaps = []; let run = null;
+  weeks.forEach((w, i) => { if (w.total === 0) { if (!run) run = {from:i, to:i}; else run.to = i; } else { if (run && run.to - run.from >= 1) gaps.push(run); run = null; } });
+  const nz = weeks.filter(w => w.total > 0).map(w => w.total).sort((a, b) => a - b);
+  const med = nz.length ? nz[Math.floor(nz.length / 2)] : 0;
+  const bursts = weeks.map((w, i) => ({i, total:w.total})).filter(x => x.total >= Math.max(5, 2.5 * med));
+  const warnings = [];
+  const mt = dated.filter(i => i.basis === 'mtime');
+  if (mt.length > 20) {
+    const days = new Map(); mt.forEach(i => { const k = isoDate(i.date); days.set(k, (days.get(k) || 0) + 1); });
+    const top = [...days.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (top[1] / mt.length > 0.4) warnings.push(`${top[1]} von ${mt.length} Dateien mit Änderungsdatum tragen denselben Tag (${fmtDate(Date.parse(top[0]))}). Das spricht für Kopieren oder Entpacken. Die Zeitleiste kann dadurch verzerrt sein. Ein Git-Export löst das.`);
+  }
+  const share = dated.filter(i => i.basis === 'mtime').length / dated.length;
+  if (share > 0.5) warnings.push(`${Math.round(share * 100)} % der Artefakte sind nur über das Änderungsdatum datiert. Es zeigt, wann du etwas zuletzt angefasst hast, nicht unbedingt, wann es entstand.`);
+  if (undated) warnings.push(`${undated} Artefakte haben kein verlässliches Datum (vor 2015 oder in der Zukunft) und fehlen in der Zeitleiste.`);
+  S.timeline = {weeks, gaps, bursts, med, warnings, undated, count: dated.length};
+  return true;
+}
+function buildPhases() {
+  const T = S.timeline; S.phases = []; if (!T) return;
+  const N = Math.max(1, +S.settings.weeksPerPhase || 4);
+  let cur = null, zero = 0, n = 0;
+  T.weeks.forEach(w => {
+    if (w.total === 0) { zero++; if (zero >= 2) cur = null; return; }
+    zero = 0;
+    if (!cur || cur.weekCount >= N) {
+      cur = {id:'p' + (++n), n, from:Infinity, to:-Infinity, wFirst:w.start, wLast:w.start, weekCount:0, itemIds:[], counts:{commit:0, code:0, text:0, chat:0, other:0}, status:'offen', result:null, error:null, sources:null};
+      S.phases.push(cur);
+    }
+    cur.weekCount++; cur.wLast = w.start;
+    (S.byWeek.get(isoDate(w.start)) || []).forEach(it => {
+      cur.itemIds.push(it.id); cur.counts[it.kind]++;
+      if (it.date < cur.from) cur.from = it.date; if (it.date > cur.to) cur.to = it.date;
+    });
+  });
+}
+function rebuildTimeline() {
+  if (S.phases.some(p => p.result) && !confirm('Die Zeitleiste neu zu berechnen verwirft alle bisherigen Analyse-Ergebnisse und Interview-Antworten. Sichere vorher dein Projekt, wenn du sie behalten willst. Fortfahren?')) return;
+  buildItems();
+  S.patterns = null; S.whatbin = null; S.spannungen = null;
+  const ok = computeTimeline();
+  if (ok) buildPhases();
+  markDirty();
+  if (!ok) { toast('Kein Artefakt hat ein verlässliches Datum.'); return; }
+  go('timeline');
+}
+function chartSvg(T) {
+  const W = 1000, H = 250, pl = 34, pr = 8, pt = 10, pb = 34, n = T.weeks.length;
+  const bw = (W - pl - pr) / n, maxV = Math.max(1, ...T.weeks.map(w => w.total));
+  const nice = (() => { const p = Math.pow(10, Math.floor(Math.log10(maxV))); const f = maxV / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; })();
+  const y = v => pt + (H - pt - pb) * (1 - v / nice);
+  let s = `<svg id="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Aktivität pro Woche, gestapelt nach Art">`;
+  [0, 0.5, 1].forEach(f => { const v = nice * f; s += `<line class="axis" x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}"/><text class="tick" x="${pl - 5}" y="${y(v) + 4}" text-anchor="end">${Math.round(v)}</text>`; });
+  T.gaps.forEach(g => { s += `<rect class="gap-rect" x="${pl + g.from * bw}" y="${pt}" width="${(g.to - g.from + 1) * bw}" height="${H - pt - pb}"><title>${g.to - g.from + 1} Wochen ohne Artefakte</title></rect>`; });
+  T.weeks.forEach((w, i) => {
+    let acc = 0; const x = pl + i * bw;
+    KIND_ORDER.forEach(k => {
+      const c = w.counts[k]; if (!c) return;
+      const y1 = y(acc + c), y0 = y(acc);
+      s += `<rect class="k-${k}" x="${x + bw * 0.08}" y="${y1}" width="${Math.max(0.6, bw * 0.84)}" height="${Math.max(0.5, y0 - y1)}"><title>Woche ab ${fmtDate(w.start)}: ${c} ${KINDS[k]}</title></rect>`;
+      acc += c;
+    });
+  });
+  let lastLabel = '', every = n > 90 ? 3 : n > 45 ? 2 : 1, mi = 0;
+  T.weeks.forEach((w, i) => {
+    const d = new Date(w.start), lab = d.getFullYear() + '-' + d.getMonth();
+    if (lab !== lastLabel) { lastLabel = lab; if ((mi++ % every) === 0) s += `<text class="tick" x="${pl + i * bw}" y="${H - 14}">${d.toLocaleDateString('de-DE', {month:'short', year:'2-digit'})}</text>`; }
+  });
+  const idxOf = ts => T.weeks.findIndex(w => w.start === ts);
+  S.phases.forEach(p => { const i = idxOf(p.wFirst); if (i >= 0) s += `<line class="phase-line" x1="${pl + i * bw}" x2="${pl + i * bw}" y1="${pt}" y2="${H - pb}"/><text class="tick" x="${pl + i * bw + 3}" y="${pt + 9}">P${p.n}</text>`; });
+  return s + '</svg>';
+}
+function renderTimeline() {
+  const T = S.timeline, el = $('#tlBody');
+  if (!T) { el.innerHTML = '<div class="empty"><p>Noch keine Zeitleiste.</p><button class="btn primary" data-go-btn="import">Material einlesen</button></div>'; bindGoBtns(el); return; }
+  let html = T.warnings.map(w => `<div class="notice">${esc(w)}</div>`).join('');
+  html += `<div class="chartwrap">${chartSvg(T)}<div class="legend">${KIND_ORDER.map(k => `<span><i class="bg-${k}"></i>${KINDS[k]}</span>`).join('')}<span><i style="background:var(--warn);opacity:.35"></i>Wochen ohne Artefakte</span></div></div>`;
+  const gapLi = T.gaps.length ? T.gaps.map(g => `<li>${fmtDate(T.weeks[g.from].start)} bis ${fmtDate(T.weeks[g.to].start + 6 * 864e5)} (${g.to - g.from + 1} Wochen)</li>`).join('') : '<li class="muted">keine</li>';
+  const burstLi = T.bursts.length ? T.bursts.map(b => `<li>Woche ab ${fmtDate(T.weeks[b.i].start)}: ${b.total} Artefakte</li>`).join('') : '<li class="muted">keine auffälligen</li>';
+  const phLi = S.phases.length ? S.phases.map(p => `<li>P${p.n}: ${fmtDate(p.from)} bis ${fmtDate(p.to)}, ${p.itemIds.length ? p.itemIds.length : p.stats ? p.stats.n : '?'} Artefakte</li>`).join('') : '<li class="muted">keine</li>';
+  html += `<div class="tl-cols">
+    <div class="card tight"><h3>Leerstellen</h3><p class="small muted">Zwei oder mehr Wochen in Folge ohne Artefakt. Für diese Zeit sind keine Aussagen aus dem Material möglich.</p><ul>${gapLi}</ul></div>
+    <div class="card tight"><h3>Verdichtungen</h3><p class="small muted">Wochen mit mindestens dem 2,5-Fachen der üblichen Aktivität (Median ${T.med}).</p><ul>${burstLi}</ul></div>
+    <div class="card tight"><h3>Phasen</h3><p class="small muted">Blöcke aktiver Wochen, getrennt durch Leerstellen. Diese Blöcke analysiert die KI einzeln.</p><ul>${phLi}</ul></div></div>
+    <div class="actions"><button class="btn primary" data-go-btn="analysis">Weiter zur Analyse</button><button class="btn" id="btnPhases">Phasen neu einteilen</button></div>`;
+  el.innerHTML = html; bindGoBtns(el);
+  $('#btnPhases').onclick = () => { $('#btnSettings').click(); toast('Ändere „Wochen mit Aktivität pro Phase“. Danach ist eine Neuberechnung nötig.'); };
+}
+function bindGoBtns(root) { $$('[data-go-btn]', root).forEach(b => b.onclick = () => go(b.dataset.goBtn)); }
+
+/* ============ KI-Zugriff ============ */
+function costText(inTok, outTok) {
+  const pi = parseFloat(S.settings.priceIn), po = parseFloat(S.settings.priceOut);
+  if (isNaN(pi) || isNaN(po)) return 'Kosten: nicht berechenbar. Trage in den Einstellungen die Preise deines Anbieters ein.';
+  return 'Kosten: ca. ' + (inTok / 1e6 * pi + outTok / 1e6 * po).toFixed(3) + ' USD (grobe Schätzung)';
+}
+function makeReq(label, system, user, extra) {
+  redactCount = 0;
+  const s = redact(system), u = redact(user);
+  return Object.assign({label, system:s, user:u, redacted:redactCount}, extra || {});
+}
+function showPreview(title, reqs) {
+  return new Promise(resolve => {
+    const dlg = $('#dlgPreview');
+    const chars = reqs.reduce((a, r) => a + r.system.length + r.user.length, 0);
+    const inTok = estTokens(chars), outTok = reqs.length * 1800, red = reqs.reduce((a, r) => a + r.redacted, 0);
+    const P = PROVIDERS[S.settings.provider];
+    $('#pvTitle').textContent = title;
+    $('#pvSummary').innerHTML = `<p>${reqs.length} Anfrage${reqs.length > 1 ? 'n' : ''} an <b>${esc(P.label)}</b> (${esc(S.settings.model || P.model)}). Gesendet werden ${chars.toLocaleString('de-DE')} Zeichen, das sind grob ${inTok.toLocaleString('de-DE')} Token. ${esc(costText(inTok, outTok))}</p>
+      ${red ? `<div class="notice info">${red} mögliche Schlüssel oder Passwörter wurden vor dem Senden durch [ENTFERNT] ersetzt.</div>` : ''}
+      ${reqs.some(r => r.hasAnswers) ? '<div class="notice">Diese Anfrage enthält deine Interview-Antworten, auch persönliche Angaben wie Gefühle und Motive.</div>' : ''}
+      ${S.settings.key ? '' : '<div class="notice">Es ist noch kein API-Key eingetragen. Das geht in den Einstellungen.</div>'}
+      <p class="small muted">Genau diesen Text erhält der Anbieter. Klappe eine Anfrage auf, um ihn zu lesen.</p>`;
+    $('#pvList').innerHTML = reqs.map(r => `<details><summary>${esc(r.label)} · ${(r.system.length + r.user.length).toLocaleString('de-DE')} Zeichen</summary><pre>${esc(r.system + '\n\n----- Material und Aufgabe -----\n\n' + r.user)}</pre></details>`).join('');
+    dlg.returnValue = '';
+    const onClose = () => { dlg.removeEventListener('close', onClose); resolve(dlg.returnValue === 'send'); };
+    dlg.addEventListener('close', onClose);
+    dlg.showModal();
+  });
+}
+function parseJSONLoose(text) {
+  let t = String(text).trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+  const a = t.indexOf('{'), b = t.lastIndexOf('}');
+  if (a < 0 || b < 0) throw new Error('Die Antwort enthält kein JSON.');
+  return JSON.parse(t.slice(a, b + 1));
+}
+async function callAI(req, opts) {
+  const {json = true, maxTokens = 4000} = opts || {};
+  const cfg = S.settings, P = PROVIDERS[cfg.provider];
+  if (!cfg.key) throw new Error('Kein API-Key eingetragen. Trage ihn in den Einstellungen ein.');
+  const url = cfg.url || P.url, model = cfg.model || P.model;
+  if (!url || !model) throw new Error('Adresse oder Modellname fehlen in den Einstellungen.');
+  const ctrl = new AbortController(); S.abort = ctrl;
+  const timer = setTimeout(() => ctrl.abort(), 240000);
+  try {
+    let res;
+    if (P.style === 'anthropic') {
+      res = await fetch(url, {method:'POST', signal:ctrl.signal, headers:{'content-type':'application/json', 'x-api-key':cfg.key, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true'},
+        body:JSON.stringify({model, max_tokens:maxTokens, system:req.system, messages:[{role:'user', content:req.user}]})});
+    } else {
+      const body = {model, messages:[{role:'system', content:req.system}, {role:'user', content:req.user}]};
+      if (cfg.provider === 'openai') body.max_completion_tokens = maxTokens; else body.max_tokens = maxTokens;
+      if (json && (cfg.provider === 'deepseek' || cfg.provider === 'openai')) body.response_format = {type:'json_object'};
+      res = await fetch(url, {method:'POST', signal:ctrl.signal, headers:{'content-type':'application/json', 'authorization':'Bearer ' + cfg.key}, body:JSON.stringify(body)});
+    }
+    const raw = await res.text(); let data = null; try { data = JSON.parse(raw); } catch {}
+    if (!res.ok) { const m = data && data.error ? (data.error.message || JSON.stringify(data.error)) : raw; throw new Error('Fehler ' + res.status + ': ' + String(m).slice(0, 300)); }
+    const out = P.style === 'anthropic' ? (data.content || []).map(b => b.text || '').join('') : data.choices[0].message.content;
+    S.sendLog.push({ts:new Date().toISOString(), label:req.label, chars:req.system.length + req.user.length, provider:cfg.provider, model, redacted:req.redacted || 0});
+    markDirty();
+    return out;
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('Abgebrochen oder Zeitlimit von 4 Minuten erreicht.');
+    if (e instanceof TypeError) throw new Error('Anfrage blockiert. Häufige Gründe: Der Anbieter erlaubt keine Aufrufe direkt aus einer lokal geöffneten Datei (CORS), die Adresse stimmt nicht oder du bist offline. Ein eigener Proxy in den Einstellungen kann das lösen.');
+    throw e;
+  } finally { clearTimeout(timer); }
+}
+
+/* ============ Prompts ============ */
+const RULES = `Du bist Archivar und Fragesteller. Du bist kein Deuter, kein Coach und kein Therapeut. Du hilfst einer Person, ihre eigene Entwicklung anhand von Dokumenten zu rekonstruieren.
+
+Verbindliche Regeln:
+1. BEOBACHTUNG enthält nur, was im Material belegt ist, mit Quellen-ID (z. B. A12). Ohne Quelle keine Beobachtung.
+2. INTERPRETATION ist immer eine Hypothese ("könnte", "zeichnet sich ab"). Schreibe nie "du bist" oder "dein Muster ist".
+3. BEWERTUNG (gut, schlecht, besonders, talentiert, Mindset-Urteile) gibst du nie als Aussage ab. Du stellst sie nur als Frage an die Person.
+4. Keine Schmeichelei, keine Heldengeschichte. Zu jeder Interpretation gehören mindestens zwei Gegenhypothesen, davon eine unbequeme (zum Beispiel Trotz, Sunk Cost, Zufall oder Ressourcen, Isolation, nachträgliche Rationalisierung, Selbsttäuschung).
+5. Lücken benennst du, statt sie zu füllen. Fehlt Material, sagst du das. Gefühle und Motive behauptest du nie, du fragst nur danach.
+6. Verwende nur Quellen-IDs, die im Material vorkommen. Zitate sind wörtlich und höchstens 15 Wörter lang.
+7. Sprache: Deutsch, sachlich, kurz.
+8. Antworte ausschließlich mit gültigem JSON nach dem vorgegebenen Schema, ohne Text davor oder danach.`;
+function phaseContext(p) {
+  const i = S.phases.indexOf(p), lines = [];
+  const desc = q => `${fmtDate(q.from)} bis ${fmtDate(q.to)}, ${(q.itemIds.length || (q.stats && q.stats.n) || 0)} Artefakte (${KIND_ORDER.filter(k => q.counts[k]).map(k => KINDS[k] + ' ' + q.counts[k]).join(', ')})`;
+  const gapW = (a, b) => Math.round((b.wFirst - a.wLast) / (7 * 864e5)) - 1;
+  if (S.phases[i - 1]) lines.push(`Vorherige Phase: ${desc(S.phases[i - 1])}. Dazwischen liegen ${gapW(S.phases[i - 1], p)} Wochen ohne Artefakte.`);
+  else lines.push('Vorherige Phase: keine (Beginn des Materials).');
+  lines.push(`Diese Phase: ${desc(p)}.`);
+  if (S.phases[i + 1]) lines.push(`Nächste Phase: ${desc(S.phases[i + 1])}. Dazwischen liegen ${gapW(p, S.phases[i + 1])} Wochen ohne Artefakte.`);
+  else lines.push('Nächste Phase: keine (Ende des Materials).');
+  return lines.join('\n');
+}
+function buildDigest(p) {
+  const items = p.itemIds.map(id => S.itemById.get(id)).filter(Boolean).sort((a, b) => a.date - b.date);
+  const budget = +S.settings.charsPerPhase || 24000, minPer = 220;
+  const maxItems = Math.max(8, Math.floor(budget / minPer));
+  let pick = items, note = '';
+  if (items.length > maxItems) { pick = []; const step = items.length / maxItems; for (let i = 0; i < maxItems; i++) pick.push(items[Math.floor(i * step)]); note = `Stichprobe: ${pick.length} von ${items.length} Artefakten, gleichmäßig über die Zeit gewählt. Aussagen gelten nur für diese Auswahl.`; }
+  const per = Math.max(0, Math.min(1600, Math.floor(budget / pick.length)) - 150);
+  const sources = {}, lines = [];
+  pick.forEach((it, i) => {
+    const id = 'A' + (i + 1); sources[id] = {path:it.path, date:it.date, kind:it.kind, basis:it.basis};
+    const head = `[${id}] ${isoDate(it.date)} | ${KINDS[it.kind]} | ${it.path} | ${fmtSize(it.size || 0)} | Datum aus: ${BASIS[it.basis]}${it.cd ? ` | Daten im Inhalt: ${it.cd[0]} bis ${it.cd[1]}` : ''}`;
+    lines.push(head + '\n' + (it.text ? snippet(it.text, per) : '(kein Textinhalt gelesen)'));
+  });
+  return {text:lines.join('\n\n'), sources, note, picked:pick.length, total:items.length};
+}
+const PHASE_SCHEMA = `{
+ "quellenlage": "dicht | duenn | nur_retrospektiv | leer",
+ "quellenlage_hinweis": "kurz, warum",
+ "beobachtung": "Was das Material dieser Phase belegt, mit Quellen-IDs",
+ "interpretation": "Hypothese, als solche formuliert",
+ "erwartet_aber_fehlt": ["Was hättest du in dieser Phase erwartet, das im Material nicht auftaucht?"],
+ "leerstellen": ["Zeiträume oder Themen ohne Material"],
+ "momente": [ {
+   "titel": "kurz",
+   "datum": "YYYY-MM-DD",
+   "typ": "bruch | fehler | durchbruch | entscheidung",
+   "beobachtung": "nur Belegbares, mit Quellen-IDs",
+   "belege": [ {"quelle": "A12", "zitat": "wörtlich, höchstens 15 Wörter"} ],
+   "interpretation": "Hypothese",
+   "gegenhypothesen": ["Alternative 1", "unbequeme Alternative 2"],
+   "methode": {"problem": "", "hypothese": "", "test": "", "fehler": "", "aenderung": "", "falsifizierbar": "Was hätte anders laufen müssen, damit die Hypothese früher verworfen worden wäre?"},
+   "frage": "Eine konkrete Frage an die Person zu diesem Moment (Bewertung nur als Frage)",
+   "sicherheit": "hoch | mittel | niedrig"
+ } ]
+}`;
+function buildPhaseRequest(p) {
+  const d = buildDigest(p);
+  const user = `AUFGABE: Analysiere Phase ${p.n} (${fmtDate(p.from)} bis ${fmtDate(p.to)}).
+
+KONTEXT (rechnerisch ermittelt, nicht von dir):
+${phaseContext(p)}
+${d.note ? '\nHINWEIS ZUR AUSWAHL: ' + d.note + '\n' : ''}
+AUSWAHL DER MOMENTE: 0 bis 4 Momente. Nur dort, wo im Material ein Bruch, Fehler, Durchbruch oder eine Entscheidung erkennbar ist. Lieber weniger als erfunden. Wenn das Material dünn ist, sag das in "quellenlage".
+Nutze die Vorher/Nachher-Zahlen für "erwartet_aber_fehlt".
+
+SCHEMA (JSON):
+${PHASE_SCHEMA}
+
+MATERIAL (${d.picked} Artefakte):
+${d.text}`;
+  return makeReq(`Phase ${p.n}: ${fmtDate(p.from)} bis ${fmtDate(p.to)}`, RULES, user, {sources:d.sources, digestNote:d.note});
+}
+function normalizeResult(r, p) {
+  const src = p.sources || {};
+  return {
+    quellenlage: str(r.quellenlage) || 'unklar', quellenlage_hinweis: str(r.quellenlage_hinweis),
+    beobachtung: str(r.beobachtung), interpretation: str(r.interpretation),
+    erwartet_aber_fehlt: arr(r.erwartet_aber_fehlt), leerstellen: arr(r.leerstellen),
+    momente: (Array.isArray(r.momente) ? r.momente : []).slice(0, 6).map((m, i) => {
+      const mm = m && typeof m === 'object' ? m : {}, me = mm.methode && typeof mm.methode === 'object' ? mm.methode : {};
+      const o = {
+        id: p.id + '-m' + (i + 1), phaseId: p.id, titel: str(mm.titel) || 'Moment ' + (i + 1), datum: str(mm.datum), typ: str(mm.typ),
+        beobachtung: str(mm.beobachtung), interpretation: str(mm.interpretation), gegenhypothesen: arr(mm.gegenhypothesen),
+        belege: (Array.isArray(mm.belege) ? mm.belege : []).map(b => ({quelle: str(b && b.quelle), zitat: str(b && b.zitat), ok: !!(b && src[b.quelle])})),
+        methode: {problem:str(me.problem), hypothese:str(me.hypothese), test:str(me.test), fehler:str(me.fehler), aenderung:str(me.aenderung), falsifizierbar:str(me.falsifizierbar)},
+        frage: str(mm.frage), sicherheit: str(mm.sicherheit), answers: {}, followups: [], correction: '', redteam: null
+      };
+      o.umfeld = computeUmfeld(o, p);
+      return o;
+    })
+  };
+}
+function momentTs(m) { const t = Date.parse(m.datum); if (isFinite(t)) return t; const p = S.phases.find(x => x.id === m.phaseId); return p ? p.from : 0; }
+function computeUmfeld(m, p) {
+  if (!S.items.length) return null;
+  const ts = momentTs(m), sorted = S.items.filter(i => i.date).sort((a, b) => a.date - b.date);
+  const before = sorted.filter(i => i.date < ts).slice(-3), after = sorted.filter(i => i.date > ts).slice(0, 3);
+  const f = i => ({date:i.date, path:i.path});
+  return {davor: before.map(f), danach: after.map(f)};
+}
+function allMoments() {
+  const out = [];
+  S.phases.forEach(p => { if (p.result && Array.isArray(p.result.momente)) p.result.momente.forEach(m => out.push(m)); });
+  return out.sort((a, b) => momentTs(a) - momentTs(b));
+}
+function momentQuestions(m) {
+  const q = [];
+  if (m.frage) q.push({id:'q_ai', text:m.frage, set:v => m.answers.q_ai = v, get:() => m.answers.q_ai || ''});
+  QUESTIONS.forEach(x => q.push({id:x.id, text:x.text, set:v => m.answers[x.id] = v, get:() => m.answers[x.id] || ''}));
+  m.followups.forEach((f, i) => q.push({id:'f' + i, text:f.q, set:v => f.a = v, get:() => f.a || '', follow:true}));
+  return q;
+}
+function momentAnswered(m) { return momentQuestions(m).filter(q => q.get().trim()).length; }
+function srcLabel(phaseId, id) {
+  const p = S.phases.find(x => x.id === phaseId), s = p && p.sources && p.sources[id];
+  return s ? `${fmtDate(s.date)} · ${s.path}` : `unbekannte Quelle „${id}“`;
+}
+
+/* ============ Schritt 3: Analyse ============ */
+function renderAnalysis() {
+  const el = $('#anBody');
+  if (!S.phases.length) { el.innerHTML = '<div class="empty"><p>Es gibt noch keine Phasen.</p><button class="btn primary" data-go-btn="import">Material einlesen</button></div>'; bindGoBtns(el); return; }
+  const canRun = S.phases.every(p => p.itemIds.length) || S.phases.some(p => p.itemIds.length);
+  const open = S.phases.filter(p => !p.result && p.itemIds.length);
+  let html = `<div class="notice info">Die KI sieht pro Phase einen Auszug aus deinem Material und kann sich irren. Prüfe ihre Belege im Interview und im Ergebnis. Quellen-IDs, die es nicht gibt, werden markiert.</div>
+    <div class="actions"><button class="btn primary" id="btnRunAll" ${open.length ? '' : 'disabled'}>${open.length ? open.length + ' offene Phasen: Vorschau und analysieren' : 'Alle Phasen analysiert'}</button>
+    <button class="btn danger" id="btnStop" ${S.busy ? '' : 'hidden'}>Abbrechen</button>
+    <button class="btn" id="btnSettings2">Einstellungen</button></div>`;
+  html += S.phases.map(p => {
+    const r = p.result, n = p.itemIds.length || (p.stats && p.stats.n) || 0;
+    const status = r ? '<span class="chip ok">fertig</span>' : p.status === 'läuft' ? '<span class="chip warn">läuft …</span>' : p.status === 'Fehler' ? '<span class="chip bad">Fehler</span>' : '<span class="chip">offen</span>';
+    let body = '';
+    if (r) {
+      body = `<div class="layer obs"><span class="ltag">Beobachtung</span><p>${esc(r.beobachtung)}</p></div>
+        <div class="layer int"><span class="ltag">Interpretation (Hypothese)</span><p>${esc(r.interpretation)}</p></div>
+        <p><span class="chip ${r.quellenlage === 'dicht' ? 'ok' : 'warn'}">Quellenlage: ${esc(r.quellenlage)}</span> <span class="small muted">${esc(r.quellenlage_hinweis)}</span></p>
+        ${r.erwartet_aber_fehlt.length ? `<h3>Erwartet, aber nicht im Material</h3><ul>${r.erwartet_aber_fehlt.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+        ${r.leerstellen.length ? `<h3>Leerstellen</h3><ul>${r.leerstellen.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+        <h3>Vorgeschlagene Momente für das Interview (${r.momente.length})</h3>${r.momente.length ? `<ul>${r.momente.map(m => `<li><b>${esc(m.titel)}</b> <span class="muted">${esc(m.datum)} · ${esc(m.typ)}</span></li>`).join('')}</ul>` : '<p class="muted">Keine. Das Material gab keinen belegbaren Moment her.</p>'}`;
+    } else if (p.error) body = `<p class="err">${esc(p.error)}</p>`;
+    return `<div class="card"><div class="phase-head"><h2>Phase ${p.n}: ${fmtDate(p.from)} bis ${fmtDate(p.to)}</h2><span>${status} <span class="chip">${n} Artefakte</span></span></div>
+      <p class="small muted">${KIND_ORDER.filter(k => p.counts[k]).map(k => KINDS[k] + ' ' + p.counts[k]).join(' · ')}</p>${p.digestNote ? `<div class="notice">${esc(p.digestNote)}</div>` : ''}${body}
+      ${p.itemIds.length ? `<button class="btn small" data-run="${p.id}">${r ? 'Neu analysieren' : 'Nur diese Phase analysieren'}</button>` : '<p class="small muted">Für eine erneute Analyse muss das Material wieder eingelesen sein.</p>'}</div>`;
+  }).join('');
+  if (S.sendLog.length) html += `<details class="card"><summary>Sendeprotokoll (${S.sendLog.length} Anfragen)</summary><table><thead><tr><th>Zeit</th><th>Inhalt</th><th class="num">Zeichen</th><th>Modell</th></tr></thead><tbody>${S.sendLog.map(l => `<tr><td>${new Date(l.ts).toLocaleString('de-DE')}</td><td>${esc(l.label)}</td><td class="num">${l.chars.toLocaleString('de-DE')}</td><td>${esc(l.provider)} / ${esc(l.model)}</td></tr>`).join('')}</tbody></table></details>`;
+  html += '<div class="actions"><button class="btn primary" data-go-btn="interview">Weiter zum Interview</button></div>';
+  el.innerHTML = html; bindGoBtns(el);
+  $('#btnSettings2').onclick = () => $('#btnSettings').click();
+  $('#btnRunAll').onclick = () => analysePhases(open);
+  $('#btnStop').onclick = () => { S.cancel = true; if (S.abort) S.abort.abort(); };
+  $$('[data-run]', el).forEach(b => b.onclick = () => analysePhases([S.phases.find(p => p.id === b.dataset.run)]));
+}
+async function analysePhases(list) {
+  const reqs = list.map(p => buildPhaseRequest(p));
+  const hasAns = list.some(p => p.result && p.result.momente.some(m => momentAnswered(m) > 0));
+  if (hasAns && !confirm('Für mindestens eine dieser Phasen gibt es schon Interview-Antworten. Eine neue Analyse ersetzt die Momente und damit auch diese Antworten. Fortfahren?')) return;
+  if (!(await showPreview('Analyse senden', reqs))) return;
+  list.forEach((p, i) => { p.sources = reqs[i].sources; p.digestNote = reqs[i].digestNote; });
+  S.cancel = false; S.busy = true; renderAnalysis();
+  for (let i = 0; i < list.length; i++) {
+    const p = list[i]; p.status = 'läuft'; p.error = null; renderAnalysis();
+    try {
+      const out = await callAI(reqs[i]);
+      p.result = normalizeResult(parseJSONLoose(out), p); p.status = 'fertig';
+      p.stats = {n: p.itemIds.length};
+    } catch (e) { p.status = 'Fehler'; p.error = e.message; }
+    if (S.cancel) break;
+  }
+  S.busy = false; markDirty(); renderAnalysis(); renderRail();
+}
+
+/* ============ Schritt 4: Interview ============ */
+function renderInterview() {
+  const el = $('#ivBody'), ms = allMoments();
+  if (!ms.length) { el.innerHTML = `<div class="empty"><p>Es gibt noch keine Momente. Sie entstehen in Schritt 3.</p><button class="btn primary" data-go-btn="analysis">Zur Analyse</button></div>`; bindGoBtns(el); return; }
+  if (!S.ui.momentId || !ms.some(m => m.id === S.ui.momentId)) { S.ui.momentId = ms[0].id; S.ui.q = 0; }
+  const m = ms.find(x => x.id === S.ui.momentId), qs = momentQuestions(m);
+  if (S.ui.q >= qs.length) S.ui.q = qs.length - 1;
+  const q = qs[S.ui.q];
+  const list = ms.map(x => `<button class="mom" data-mom="${x.id}" aria-current="${x.id === m.id}"><span class="d">${esc(x.datum || fmtDate(momentTs(x)))} · ${esc(x.typ)}</span><span class="tt">${esc(x.titel)}</span><span class="small muted">${momentAnswered(x)} von ${momentQuestions(x).length} beantwortet</span></button>`).join('');
+  const belege = m.belege.length ? `<ul>${m.belege.map(b => `<li>${b.ok ? '' : '<span class="chip bad">Quelle prüfen</span> '}<span class="small">${esc(srcLabel(m.phaseId, b.quelle))}</span>${b.zitat ? `<br><em>„${esc(b.zitat)}“</em>` : ''}</li>`).join('')}</ul>` : '<p class="muted small">Keine Belege genannt.</p>';
+  const umf = m.umfeld ? `<div class="grid2"><div><h3>Davor</h3>${m.umfeld.davor.length ? `<ul class="small">${m.umfeld.davor.map(x => `<li>${fmtDate(x.date)} · ${esc(x.path)}</li>`).join('')}</ul>` : '<p class="small muted">nichts</p>'}</div><div><h3>Danach</h3>${m.umfeld.danach.length ? `<ul class="small">${m.umfeld.danach.map(x => `<li>${fmtDate(x.date)} · ${esc(x.path)}</li>`).join('')}</ul>` : '<p class="small muted">nichts</p>'}</div></div>` : '<p class="small muted">Das Umfeld (Davor und Danach) ist nur mit eingelesenem Material sichtbar.</p>';
+  const me = m.methode;
+  const rt = m.redteam ? `<div class="notice"><b>Unbequemste Alternative:</b> ${esc(m.redteam.alternative)}<br><span class="small">Warum plausibel: ${esc(m.redteam.wieso_plausibel)}<br>Was dagegen spricht: ${esc(m.redteam.was_dagegen_spricht)}<br>Was entscheiden würde: ${esc(m.redteam.welcher_beleg_wuerde_entscheiden)}</span></div>` : '';
+  el.innerHTML = `<div class="interview"><aside class="momlist" aria-label="Momente">${list}</aside><div>
+    <div class="card"><div class="phase-head"><h2>${esc(m.titel)}</h2><span><span class="chip">${esc(m.datum || '')}</span> <span class="chip">${esc(m.typ)}</span> <span class="chip ${m.sicherheit === 'hoch' ? 'ok' : 'warn'}">Sicherheit: ${esc(m.sicherheit || '?')}</span></span></div>
+      <div class="layer obs"><span class="ltag">Beobachtung</span><p>${esc(m.beobachtung)}</p></div>
+      <div class="layer int"><span class="ltag">Interpretation (Hypothese)</span><p>${esc(m.interpretation)}</p></div>
+      <h3>Belege</h3>${belege}${umf}
+      <h3>Gegenhypothesen</h3><ul>${m.gegenhypothesen.map(x => `<li>${esc(x)}</li>`).join('') || '<li class="muted">keine genannt</li>'}</ul>
+      <button class="btn small" id="btnRed">Unangenehmste Alternative suchen</button>${rt}
+      <h3 style="margin-top:1rem">Methoden-Spur</h3>
+      <div class="methode"><div><b>Problem</b>${esc(me.problem) || '–'}</div><div><b>Hypothese</b>${esc(me.hypothese) || '–'}</div><div><b>Test</b>${esc(me.test) || '–'}</div><div><b>Fehler</b>${esc(me.fehler) || '–'}</div><div><b>Änderung</b>${esc(me.aenderung) || '–'}</div></div>
+      <div class="methode"><div style="grid-column:1/-1"><b>Falsifizierbarkeit: Was hätte anders laufen müssen, damit die Hypothese früher verworfen worden wäre?</b>${esc(me.falsifizierbar) || '–'}</div></div>
+      <label class="f" for="corr">Deine Korrektur zur Methoden-Spur (optional)</label><textarea id="corr" style="min-height:4rem">${esc(m.correction)}</textarea></div>
+    <div class="card"><div class="layer val"><span class="ltag">Bewertung – Frage an dich (${S.ui.q + 1} von ${qs.length})</span><p><b>${esc(q.text)}</b></p></div>
+      <label class="f" for="ans">Deine Antwort</label><textarea id="ans" placeholder="In eigenen Worten. Leer lassen ist in Ordnung.">${esc(q.get())}</textarea>
+      <div class="actions"><button class="btn" id="qPrev" ${S.ui.q === 0 ? 'disabled' : ''}>Zurück</button><button class="btn primary" id="qNext">${S.ui.q === qs.length - 1 ? 'Nächster Moment' : (q.get().trim() ? 'Weiter' : 'Überspringen')}</button><button class="btn" id="qFollow">Nachfrage von der KI</button></div></div>
+    <div class="actions"><button class="btn primary" data-go-btn="results">Weiter zum Ergebnis</button></div></div></div>`;
+  bindGoBtns(el);
+  $$('[data-mom]', el).forEach(b => b.onclick = () => { S.ui.momentId = b.dataset.mom; S.ui.q = 0; renderInterview(); });
+  $('#ans').addEventListener('input', e => { q.set(e.target.value); markDirty(); renderRail(); const c = $(`[data-mom="${m.id}"] .small.muted`); if (c) c.textContent = momentAnswered(m) + ' von ' + momentQuestions(m).length + ' beantwortet'; $('#qNext').textContent = S.ui.q === qs.length - 1 ? 'Nächster Moment' : (e.target.value.trim() ? 'Weiter' : 'Überspringen'); });
+  $('#corr').addEventListener('input', e => { m.correction = e.target.value; markDirty(); });
+  $('#qPrev').onclick = () => { S.ui.q = Math.max(0, S.ui.q - 1); renderInterview(); };
+  $('#qNext').onclick = () => {
+    if (S.ui.q < qs.length - 1) S.ui.q++; else { const i = ms.findIndex(x => x.id === m.id); if (i < ms.length - 1) { S.ui.momentId = ms[i + 1].id; S.ui.q = 0; } else toast('Das war der letzte Moment.'); }
+    renderInterview();
+  };
+  $('#btnRed').onclick = () => redTeam(m);
+  $('#qFollow').onclick = () => followUp(m);
+}
+function momentBrief(m, withAnswers) {
+  const o = {datum:m.datum, typ:m.typ, titel:m.titel, beobachtung:m.beobachtung, interpretation:m.interpretation, gegenhypothesen:m.gegenhypothesen, methode:m.methode};
+  if (withAnswers) {
+    const a = {}; momentQuestions(m).forEach(q => { const v = q.get().trim(); if (v) a[q.text] = v.slice(0, 900); });
+    o.antworten = a; if (m.correction) o.korrektur_methode = m.correction;
+  }
+  return JSON.stringify(o, null, 1);
+}
+async function followUp(m) {
+  const user = `AUFGABE: Stelle genau EINE Nachfrage, die zu den bisherigen Antworten der Person passt und etwas klärt, das noch offen ist. Keine Wertung, keine Deutung ihrer Gefühle, keine Suggestivfrage.\nSCHEMA: {"frage": "..."}\n\nMOMENT UND BISHERIGE ANTWORTEN:\n${momentBrief(m, true)}`;
+  const req = makeReq('Nachfrage zu: ' + m.titel, RULES, user, {hasAnswers:true});
+  if (!(await showPreview('Nachfrage senden', [req]))) return;
+  try {
+    const r = parseJSONLoose(await callAI(req, {maxTokens:600}));
+    if (!r.frage) throw new Error('Die Antwort enthielt keine Frage.');
+    m.followups.push({q:str(r.frage), a:''}); S.ui.q = momentQuestions(m).length - 1; markDirty(); renderInterview();
+  } catch (e) { toast(e.message); }
+}
+async function redTeam(m) {
+  const user = `AUFGABE: Nenne die unbequemste plausible Alternativerklärung für diesen Moment, also eine, die das Bild von Lernen und Können am stärksten in Frage stellt (zum Beispiel Trotz, Sunk Cost, Ressourcen oder Zufall, Isolation, nachträgliche Rationalisierung). Keine Beleidigung, keine Diagnose.\nSCHEMA: {"alternative": "...", "wieso_plausibel": "...", "was_dagegen_spricht": "...", "welcher_beleg_wuerde_entscheiden": "..."}\n\nMOMENT:\n${momentBrief(m, true)}`;
+  const req = makeReq('Red-Team zu: ' + m.titel, RULES, user, {hasAnswers:true});
+  if (!(await showPreview('Red-Team-Anfrage senden', [req]))) return;
+  try {
+    const r = parseJSONLoose(await callAI(req, {maxTokens:900}));
+    m.redteam = {alternative:str(r.alternative), wieso_plausibel:str(r.wieso_plausibel), was_dagegen_spricht:str(r.was_dagegen_spricht), welcher_beleg_wuerde_entscheiden:str(r.welcher_beleg_wuerde_entscheiden)};
+    markDirty(); renderInterview();
+  } catch (e) { toast(e.message); }
+}
+
+/* ============ Schritt 5: Ergebnis ============ */
+const PATTERN_SCHEMA = `{
+ "muster": [ {
+   "titel": "kurz und sachlich",
+   "beobachtung": "was sich wiederholt, mit Moment-IDs",
+   "moment_ids": ["p1-m1", "p2-m3"],
+   "belege": ["..."],
+   "gegenbelege": ["..."],
+   "erstmals_sichtbar": "YYYY-MM-DD",
+   "entwicklung": "wie es sich über die Zeit verändert hat",
+   "moeglicher_vorteil": "...",
+   "moegliche_gefahr": "...",
+   "eigene_erklaerung": "wörtlich aus den Antworten der Person, sonst leer",
+   "alternativerklaerungen": ["...", "..."],
+   "uebertragbarkeit": "Falls übertragbar, woran würde man es erkennen?",
+   "sicherheit": "hoch | mittel | niedrig"
+ } ],
+ "widersprueche": [ {"muster_a": "Titel eines Musters", "muster_b": "Titel eines anderen Musters", "warum_nicht_beide_wahr": "...", "was_entscheiden_wuerde": "..."} ],
+ "zu_wenig_belegt": ["Vermutungen, die nur einen Moment stützen"],
+ "nicht_beantwortbar": [ {"frage": "Frage, die das Material nicht hergibt", "form": "beschaffbar | experimentierbar | unentscheidbar", "begruendung": "..."} ]
+}`;
+function buildPatternRequest() {
+  const ms = allMoments().map(m => { const o = JSON.parse(momentBrief(m, true)); o.id = m.id; return o; });
+  const user = `AUFGABE: Suche wiederkehrende Verhaltensmuster über alle Momente hinweg.
+- Ein Muster braucht mindestens zwei Momente (moment_ids). Was nur ein Moment stützt, gehört in "zu_wenig_belegt".
+- Formuliere "hier zeichnet sich ein Muster ab", nicht "dein Muster ist".
+- Jedes Muster hat Belege UND Gegenbelege sowie mindestens zwei Alternativerklärungen.
+- "eigene_erklaerung" nur, wenn die Person sie in den Antworten selbst genannt hat, wörtlich.
+- "widersprueche": Prüfe, ob zwei deiner Muster nicht gleichzeitig wahr sein können. Nenne nur echte Widersprüche mit den exakten Titeln der Muster. Eine leere Liste ist eine gültige Antwort. Erfinde nichts.
+- "nicht_beantwortbar": Fragen, die dieses Material nicht hergibt (zum Beispiel Zeiträume ohne Belege oder Motive ohne Antwort). Gib jeder Frage eine "form": beschaffbar (fehlendes Material lässt sich besorgen), experimentierbar (ein kleiner Test würde entscheiden) oder unentscheidbar (bleibt offen und wird nicht gefüllt).
+- Keine Aussage darüber, ob die Person besonders ist oder etwas Neues geschaffen hat.
+
+SCHEMA (JSON):
+${PATTERN_SCHEMA}
+
+MOMENTE:
+${JSON.stringify(ms, null, 1)}`;
+  return makeReq('Muster über alle Momente', RULES, user, {hasAnswers:true});
+}
+async function runPatterns() {
+  if (!allMoments().length) { toast('Es gibt noch keine Momente.'); return; }
+  if (S.patterns && S.patterns.muster.some(x => x.operation) && !confirm('Eine neue Mustersuche ersetzt die bestehenden Muster samt Operationskarten und deinen Einträgen zum nächsten Test. Fortfahren?')) return;
+  const req = buildPatternRequest();
+  if (!(await showPreview('Muster-Anfrage senden', [req]))) return;
+  try {
+    const r = parseJSONLoose(await callAI(req, {maxTokens:6000}));
+    S.patterns = {
+      muster: (Array.isArray(r.muster) ? r.muster : []).map(x => ({titel:str(x.titel), beobachtung:str(x.beobachtung), moment_ids:arr(x.moment_ids), belege:arr(x.belege), gegenbelege:arr(x.gegenbelege), erstmals_sichtbar:str(x.erstmals_sichtbar), entwicklung:str(x.entwicklung), moeglicher_vorteil:str(x.moeglicher_vorteil), moegliche_gefahr:str(x.moegliche_gefahr), eigene_erklaerung:str(x.eigene_erklaerung), alternativerklaerungen:arr(x.alternativerklaerungen), uebertragbarkeit:str(x.uebertragbarkeit), sicherheit:str(x.sicherheit), redteam:null, operation:null})),
+      zu_wenig_belegt: arr(r.zu_wenig_belegt), nicht_beantwortbar: normQs(r.nicht_beantwortbar), widersprueche: normContradictions(r.widersprueche), at: new Date().toISOString()
+    };
+    S.whatbin = null; markDirty(); S.ui.tab = 'M'; renderResults(); renderRail();
+  } catch (e) { toast(e.message); }
+}
+const BIN_SCHEMA = `{
+ "verhaltensbeschreibung": "3 bis 5 Sätze, nur aus den Mustern, ohne Etikett",
+ "begriffe": [ {
+   "begriff": "...",
+   "urteil": "passt | teilweise | passt nicht | nicht entscheidbar",
+   "definition_die_ich_annehme": "...",
+   "begruendung": "...",
+   "muster_titel": ["Titel der Muster, auf die du dich stützt"],
+   "gegenbelege": "...",
+   "ungewoehnlich": "was daran ungewöhnlich wäre, oder leer",
+   "erlernbar": "Einschätzung, ob andere es entwickeln könnten, oder leer"
+ } ],
+ "anmerkung_zur_bezeichnung": "warum die Frage nach dem Namen offen bleiben kann",
+ "nicht_beantwortbar": [ {"frage": "...", "form": "beschaffbar | experimentierbar | unentscheidbar", "begruendung": "..."} ]
+}`;
+async function runWhatBin() {
+  const p = S.patterns; if (!p || !p.muster.length) { toast('Dafür braucht es zuerst Muster.'); return; }
+  const user = `AUFGABE: Beantworte die Frage "Welche Bezeichnung passt zu dem Arbeitsmodus, den die Muster zeigen?"
+- Beginne mit einer Verhaltensbeschreibung ohne Etikett.
+- Prüfe den Begriff "Vibe Coder" ausdrücklich. Nenne die Definition, die du annimmst, und prüfe, ob eine andere gängige Definition zu einem anderen Urteil führt.
+- Prüfe drei bis fünf weitere Begriffe deiner Wahl, auch unbequeme.
+- Ein Begriff darf nur "passt" bekommen, wenn mindestens zwei Muster ihn stützen.
+- Keine Aussage darüber, ob die Person besonders ist, ob ihr System "echt" ist oder ob sie etwas Neues eingeleitet hat. Das lässt sich aus diesem Material nicht beurteilen.
+- Bewertungen nur als Urteil zu einem Begriff mit Begründung, nie als Lob.
+- "nicht_beantwortbar": jede Frage mit "form" (beschaffbar = fehlendes Material lässt sich besorgen, experimentierbar = ein kleiner Test würde entscheiden, unentscheidbar = bleibt offen).
+
+SCHEMA (JSON):
+${BIN_SCHEMA}
+
+MUSTER:
+${JSON.stringify(p.muster.map(x => ({titel:x.titel, beobachtung:x.beobachtung, belege:x.belege, gegenbelege:x.gegenbelege, alternativerklaerungen:x.alternativerklaerungen, sicherheit:x.sicherheit})), null, 1)}
+
+OFFENE FRAGEN AUS DER MUSTERSUCHE:
+${JSON.stringify(p.nicht_beantwortbar)}`;
+  const req = makeReq('Was bin ich? Begriffe prüfen', RULES, user, {hasAnswers:true});
+  if (!(await showPreview('Anfrage senden', [req]))) return;
+  try {
+    const r = parseJSONLoose(await callAI(req, {maxTokens:4500}));
+    S.whatbin = {verhaltensbeschreibung:str(r.verhaltensbeschreibung), anmerkung:str(r.anmerkung_zur_bezeichnung), nicht_beantwortbar:normQs(r.nicht_beantwortbar), at:new Date().toISOString(),
+      begriffe:(Array.isArray(r.begriffe) ? r.begriffe : []).map(b => ({begriff:str(b.begriff), urteil:str(b.urteil), definition:str(b.definition_die_ich_annehme), begruendung:str(b.begruendung), muster_titel:arr(b.muster_titel), gegenbelege:str(b.gegenbelege), ungewoehnlich:str(b.ungewoehnlich), erlernbar:str(b.erlernbar)}))};
+    markDirty(); S.ui.tab = 'W'; renderResults();
+  } catch (e) { toast(e.message); }
+}
+async function redTeamPattern(pt) {
+  const user = `AUFGABE: Nenne die unbequemste plausible Alternativerklärung für dieses Muster (zum Beispiel Sunk Cost, Trotz, Ressourcen oder Zufall, Isolation, nachträgliche Rationalisierung). Keine Beleidigung, keine Diagnose.\nSCHEMA: {"alternative": "...", "wieso_plausibel": "...", "was_dagegen_spricht": "...", "welcher_beleg_wuerde_entscheiden": "..."}\n\nMUSTER:\n${JSON.stringify(pt)}`;
+  const req = makeReq('Red-Team zu Muster: ' + pt.titel, RULES, user);
+  if (!(await showPreview('Red-Team-Anfrage senden', [req]))) return;
+  try {
+    const r = parseJSONLoose(await callAI(req, {maxTokens:900}));
+    pt.redteam = {alternative:str(r.alternative), wieso_plausibel:str(r.wieso_plausibel), was_dagegen_spricht:str(r.was_dagegen_spricht), welcher_beleg_wuerde_entscheiden:str(r.welcher_beleg_wuerde_entscheiden)};
+    markDirty(); renderResults();
+  } catch (e) { toast(e.message); }
+}
+function layersHtml(m) {
+  const ans = momentQuestions(m).filter(q => q.get().trim());
+  return `<div class="layer obs"><span class="ltag">Beobachtung</span><p>${esc(m.beobachtung)}</p></div>
+    <div class="layer int"><span class="ltag">Interpretation (Hypothese)</span><p>${esc(m.interpretation)}</p></div>
+    <div class="layer val"><span class="ltag">Bewertung – Frage an dich und deine Antworten</span>${ans.length ? ans.map(q => `<p><b>${esc(q.text)}</b></p><p class="ans">${esc(q.get())}</p>`).join('') : `<p class="muted">Noch nicht beantwortet: ${esc(m.frage)}</p>`}</div>`;
+}
+function renderResults() {
+  const el = $('#resBody'), ms = allMoments();
+  if (!ms.length && !S.patterns) { el.innerHTML = '<div class="empty"><p>Noch nichts zu zeigen. Das Ergebnis entsteht aus Analyse und Interview.</p><button class="btn primary" data-go-btn="analysis">Zur Analyse</button></div>'; bindGoBtns(el); return; }
+  const tabs = [['A', 'Chronik: Mensch'], ['B', 'Chronik: Methode'], ['M', 'Muster'], ['W', 'Was bin ich?'], ['S', 'Spannungen'], ['F', 'Offene Fragen'], ['L', 'Behauptungen'], ['E', 'Export und Vergleich']];
+  let html = `<div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button role="tab" data-tab="${k}" aria-selected="${S.ui.tab === k}">${l}</button>`).join('')}</div>`;
+  const tab = S.ui.tab;
+  if (tab === 'A') {
+    html += `<p class="lede">Deine Entwicklung als Abfolge von Momenten. Jede Ebene bleibt getrennt: was belegt ist, was vermutet wird und was nur du bewerten kannst.</p>`;
+    html += ms.map(m => `<div class="card"><div class="phase-head"><h2>${esc(m.titel)}</h2><span class="chip">${esc(m.datum || fmtDate(momentTs(m)))} · ${esc(m.typ)}</span></div>${layersHtml(m)}</div>`).join('') || '<p class="muted">Keine Momente.</p>';
+  } else if (tab === 'B') {
+    html += `<p class="lede">Wie du Probleme tatsächlich angegangen bist. Wiederholt sich dieselbe Abfolge, zeigt sich hier eine Methode. Nur eine einzelne Reihe beweist noch keine.</p>`;
+    html += ms.map(m => { const me = m.methode; return `<div class="card"><div class="phase-head"><h2>${esc(m.titel)}</h2><span class="chip">${esc(m.datum || '')}</span></div>
+      <div class="methode"><div><b>Problem</b>${esc(me.problem) || '–'}</div><div><b>Hypothese</b>${esc(me.hypothese) || '–'}</div><div><b>Test</b>${esc(me.test) || '–'}</div><div><b>Fehler</b>${esc(me.fehler) || '–'}</div><div><b>Änderung</b>${esc(me.aenderung) || '–'}</div></div>
+      <div class="layer int"><span class="ltag">Falsifizierbarkeit</span><p>${esc(me.falsifizierbar) || '–'}</p></div>${m.correction ? `<div class="layer val"><span class="ltag">Deine Korrektur</span><p class="ans">${esc(m.correction)}</p></div>` : ''}</div>`; }).join('') || '<p class="muted">Keine Momente.</p>';
+  } else if (tab === 'M') {
+    const P = S.patterns;
+    html += `<p class="lede">Muster stützen sich auf mindestens zwei Momente. „Hier zeichnet sich etwas ab“ ist kein Urteil über dich.</p><div class="actions"><button class="btn primary" id="btnPat">${P ? 'Muster neu suchen' : 'Muster suchen'}</button></div>`;
+    if (!P) html += '<div class="empty">Noch nicht gesucht. Beantworte vorher im Interview so viele Fragen wie möglich. Die Muster werden besser, je mehr eigene Antworten vorliegen.</div>';
+    else {
+      html += P.muster.map((x, i) => `<div class="card"><div class="phase-head"><h2>Muster ${i + 1}: ${esc(x.titel)}</h2><span class="chip ${x.sicherheit === 'hoch' ? 'ok' : 'warn'}">Sicherheit: ${esc(x.sicherheit || '?')}</span></div>
+        <div class="layer obs"><span class="ltag">Beobachtung</span><p>${esc(x.beobachtung)}</p><p class="small muted">Momente: ${x.moment_ids.map(id => { const m = ms.find(z => z.id === id); return esc(m ? m.titel : id + ' (unbekannt)'); }).join('; ')}</p></div>
+        <p><b>Belege</b></p><ul>${x.belege.map(b => `<li>${esc(b)}</li>`).join('') || '<li class="muted">–</li>'}</ul>
+        <p><b>Gegenbelege</b></p><ul>${x.gegenbelege.map(b => `<li>${esc(b)}</li>`).join('') || '<li class="muted">–</li>'}</ul>
+        <p><b>Alternativerklärungen</b></p><ul>${x.alternativerklaerungen.map(b => `<li>${esc(b)}</li>`).join('') || '<li class="muted">–</li>'}</ul>
+        <p class="small"><b>Erstmals sichtbar:</b> ${esc(x.erstmals_sichtbar) || '–'}<br><b>Entwicklung:</b> ${esc(x.entwicklung) || '–'}<br><b>Möglicher Vorteil:</b> ${esc(x.moeglicher_vorteil) || '–'}<br><b>Mögliche Gefahr:</b> ${esc(x.moegliche_gefahr) || '–'}</p>
+        <div class="layer val"><span class="ltag">Deine eigene Erklärung</span><p class="ans">${esc(x.eigene_erklaerung) || 'Noch keine genannt.'}</p></div>
+        <p class="small"><b>Übertragbarkeit:</b> ${esc(x.uebertragbarkeit) || '–'}</p>
+        ${operationHtml(x, i)}<button class="btn small" data-redpat="${i}">Unangenehmste Alternative suchen</button> <button class="btn small" data-oppat="${i}">${x.operation ? 'Operationskarte neu erzeugen' : 'Operationskarte erzeugen'}</button>
+        ${x.redteam ? `<div class="notice"><b>${esc(x.redteam.alternative)}</b><br><span class="small">Warum plausibel: ${esc(x.redteam.wieso_plausibel)}<br>Was dagegen spricht: ${esc(x.redteam.was_dagegen_spricht)}<br>Was entscheiden würde: ${esc(x.redteam.welcher_beleg_wuerde_entscheiden)}</span></div>` : ''}</div>`).join('') || '<div class="empty">Die KI hat kein Muster gefunden, das zwei Momente stützen.</div>';
+      html += contradictionsHtml(P);
+      if (P.zu_wenig_belegt.length) html += `<div class="card"><h3>Zu wenig belegt</h3><ul>${P.zu_wenig_belegt.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>`;
+    }
+  } else if (tab === 'W') {
+    const W = S.whatbin;
+    html += `<p class="lede">Die Frage nach dem Namen kommt zuletzt und ist eine Prüfung: Welche Begriffe deckt das belegte Verhalten, welche nicht?</p>`;
+    if (!S.patterns || !S.patterns.muster.length) html += '<div class="empty">Zuerst müssen Muster vorliegen.</div>';
+    else {
+      html += `<div class="actions"><button class="btn primary" id="btnBin">${W ? 'Begriffe neu prüfen' : 'Begriffe prüfen'}</button></div>`;
+      if (W) {
+        html += `<div class="layer obs"><span class="ltag">Verhaltensbeschreibung ohne Etikett</span><p>${esc(W.verhaltensbeschreibung)}</p></div>`;
+        html += W.begriffe.map(b => `<div class="card"><div class="phase-head"><h2>${esc(b.begriff)}</h2><span class="chip ${b.urteil === 'passt' ? 'ok' : b.urteil === 'passt nicht' ? 'bad' : 'warn'}">${esc(b.urteil)}</span></div>
+          <p class="small muted">Angenommene Definition: ${esc(b.definition)}</p><p>${esc(b.begruendung)}</p>
+          <p class="small"><b>Gestützt auf:</b> ${esc(b.muster_titel.join('; ')) || '–'}<br><b>Gegenbelege:</b> ${esc(b.gegenbelege) || '–'}<br><b>Ungewöhnlich:</b> ${esc(b.ungewoehnlich) || '–'}<br><b>Erlernbar:</b> ${esc(b.erlernbar) || '–'}</p></div>`).join('');
+        if (W.anmerkung) html += `<div class="notice info">${esc(W.anmerkung)}</div>`;
+      }
+    }
+  } else if (tab === 'S') {
+    html += spannungenHtml();
+  } else if (tab === 'F') {
+    html += `<p class="lede">Was dieses Material nicht hergibt. Jede Frage hat eine von drei Formen. Nur beschaffbare und experimentierbare bekommen einen Arbeitsauftrag, den du selbst formulierst. Unentscheidbares bleibt offen und wird nicht gefüllt.</p>
+      <div class="notice info">„Vorläufig eingestuft“ heißt: eine einfache Regel hat die Form gesetzt (fehlendes Material gilt als beschaffbar). Ändere sie, wenn sie nicht stimmt.</div>${openQsHtml()}`;
+  } else if (tab === 'L') {
+    html += claimsHtml();
+  } else if (tab === 'E') {
+    html += `<div class="card"><h3>Ergebnis als Markdown speichern</h3><p>Chronik, Muster, Begriffe und offene Fragen in einer Datei, getrennt nach Beobachtung, Interpretation und Bewertung. Die Datei liegt nur bei dir.</p><button class="btn primary" id="btnMd">Markdown herunterladen</button></div>
+      <div class="card"><h3>Projekt sichern</h3><p>Sichert Zeitleiste, Analyse, Antworten und Sendeprotokoll als Datei, ohne API-Key und ohne dein Rohmaterial. Jeder Lauf bekommt einen Zeitstempel. So kannst du in einem Jahr dieselbe Analyse noch einmal machen und beide vergleichen.</p><button class="btn" id="btnSave2">Projekt sichern</button></div>
+      <div class="card"><h3>Mit früherer Analyse vergleichen</h3><label class="btn" style="cursor:pointer">Frühere Projektdatei wählen<input type="file" id="loadCmp" accept=".json,application/json" hidden></label>${S.compare ? renderCompare() : ''}</div>`;
+  }
+  el.innerHTML = html; bindGoBtns(el);
+  $$('[data-tab]', el).forEach(b => b.onclick = () => { S.ui.tab = b.dataset.tab; renderResults(); });
+  const on = (id, fn) => { const x = $(id, el); if (x) x.onclick = fn; };
+  on('#btnPat', runPatterns); on('#btnBin', runWhatBin); on('#btnMd', () => download('genesis-ergebnis-' + isoDate(Date.now()) + '.md', toMarkdown(), 'text/markdown')); on('#btnSave2', saveProject);
+  $$('[data-redpat]', el).forEach(b => b.onclick = () => redTeamPattern(S.patterns.muster[+b.dataset.redpat]));
+  bindResultsExtras(el);
+  const cmp = $('#loadCmp', el); if (cmp) cmp.onchange = e => loadProjectFile(e.target.files[0], true);
+}
+function renderCompare() {
+  const C = S.compare, N = S.patterns, cm = (C.phases || []).flatMap(p => p.result ? p.result.momente : []), nm = allMoments();
+  const ans = ms => ms.reduce((a, m) => a + Object.values(m.answers || {}).filter(v => String(v).trim()).length + (m.followups || []).filter(f => f.a && f.a.trim()).length, 0);
+  const titles = p => (p && p.muster ? p.muster.map(x => x.titel) : []);
+  const tOld = titles(C.patterns), tNew = titles(N), low = s => s.trim().toLowerCase();
+  const li = (a, b) => a.length ? `<ul>${a.map(t => `<li>${esc(t)} ${b.some(x => low(x) === low(t)) ? '<span class="chip ok">in beiden</span>' : '<span class="chip warn">nur hier</span>'}</li>`).join('')}</ul>` : '<p class="muted small">keine</p>';
+  const bo = C.whatbin ? C.whatbin.begriffe.map(b => `${b.begriff}: ${b.urteil}`) : [], bn = S.whatbin ? S.whatbin.begriffe.map(b => `${b.begriff}: ${b.urteil}`) : [];
+  return `<h3 style="margin-top:1rem">Vergleich</h3><table><thead><tr><th></th><th>Frühere Analyse (${C.savedAt ? new Date(C.savedAt).toLocaleDateString('de-DE') : '?'})</th><th>Aktuelle Analyse</th></tr></thead><tbody>
+    <tr><td>Phasen</td><td>${(C.phases || []).length}</td><td>${S.phases.length}</td></tr>
+    <tr><td>Momente</td><td>${cm.length}</td><td>${nm.length}</td></tr>
+    <tr><td>Beantwortete Fragen</td><td>${ans(cm)}</td><td>${ans(nm)}</td></tr>
+    <tr><td>Muster</td><td>${li(tOld, tNew)}</td><td>${li(tNew, tOld)}</td></tr>
+    <tr><td>Begriffe und Urteile</td><td>${bo.length ? '<ul>' + bo.map(x => `<li>${esc(x)}</li>`).join('') + '</ul>' : '–'}</td><td>${bn.length ? '<ul>' + bn.map(x => `<li>${esc(x)}</li>`).join('') + '</ul>' : '–'}</td></tr></tbody></table>
+    <p class="small muted">Gleiche Titel zeigen nur, dass ein Muster wieder aufgetaucht ist. Ob es sich verändert hat, siehst du in den Texten.</p>`;
+}
+function toMarkdown() {
+  const ms = allMoments(), L = [];
+  L.push('# Genesis: Rekonstruktion meiner Entwicklung', '', `Erstellt am ${new Date().toLocaleString('de-DE')}. Eine KI hat Belege geordnet und Fragen gestellt. Bewertungen stammen nur von mir.`, '');
+  if (S.timeline) L.push(`Zeitraum des Materials: ${fmtDate(S.timeline.weeks[0].start)} bis ${fmtDate(S.timeline.weeks[S.timeline.weeks.length - 1].start + 6 * 864e5)}, ${S.timeline.count} Artefakte.`, '');
+  if (S.timeline && S.timeline.warnings.length) { L.push('**Hinweise zur Datenlage**', ''); S.timeline.warnings.forEach(w => L.push('- ' + w)); L.push(''); }
+  L.push('## Chronik: Mensch', '');
+  ms.forEach(m => {
+    L.push(`### ${m.titel} (${m.datum || fmtDate(momentTs(m))}, ${m.typ})`, '', `**Beobachtung:** ${m.beobachtung}`, '', `**Interpretation (Hypothese):** ${m.interpretation}`, '');
+    if (m.gegenhypothesen.length) { L.push('**Gegenhypothesen:**'); m.gegenhypothesen.forEach(g => L.push('- ' + g)); L.push(''); }
+    const a = momentQuestions(m).filter(q => q.get().trim());
+    L.push('**Bewertung (meine Antworten):**', '');
+    if (a.length) a.forEach(q => L.push(`- *${q.text}*`, `  ${q.get().trim().replace(/\n/g, '\n  ')}`)); else L.push('- (noch nicht beantwortet)');
+    L.push('');
+  });
+  L.push('## Chronik: Methode', '');
+  ms.forEach(m => { const e = m.methode; L.push(`### ${m.titel}`, '', `- Problem: ${e.problem || '–'}`, `- Hypothese: ${e.hypothese || '–'}`, `- Test: ${e.test || '–'}`, `- Fehler: ${e.fehler || '–'}`, `- Änderung: ${e.aenderung || '–'}`, `- Falsifizierbarkeit: ${e.falsifizierbar || '–'}`); if (m.correction) L.push(`- Meine Korrektur: ${m.correction}`); L.push(''); });
+  if (S.patterns) {
+    L.push('## Muster', '');
+    S.patterns.muster.forEach((x, i) => {
+      L.push(`### Muster ${i + 1}: ${x.titel} (Sicherheit: ${x.sicherheit || '?'})`, '', `**Beobachtung:** ${x.beobachtung}`, '', '**Belege:**'); x.belege.forEach(b => L.push('- ' + b));
+      L.push('', '**Gegenbelege:**'); x.gegenbelege.forEach(b => L.push('- ' + b));
+      L.push('', '**Alternativerklärungen:**'); x.alternativerklaerungen.forEach(b => L.push('- ' + b));
+      L.push('', `- Erstmals sichtbar: ${x.erstmals_sichtbar || '–'}`, `- Entwicklung: ${x.entwicklung || '–'}`, `- Möglicher Vorteil: ${x.moeglicher_vorteil || '–'}`, `- Mögliche Gefahr: ${x.moegliche_gefahr || '–'}`, `- Meine eigene Erklärung: ${x.eigene_erklaerung || '–'}`, `- Übertragbarkeit: ${x.uebertragbarkeit || '–'}`);
+      if (x.operation) operationLines(x).forEach(l => L.push(l));
+      if (x.redteam) L.push(`- Unbequemste Alternative: ${x.redteam.alternative} (dagegen: ${x.redteam.was_dagegen_spricht})`);
+      L.push('');
+    });
+    if ((S.patterns.widersprueche || []).length) { L.push('### Widersprüche zwischen Mustern', ''); S.patterns.widersprueche.forEach(c => L.push(`- ${c.muster_a} gegen ${c.muster_b}: ${c.warum} (entscheiden würde: ${c.entscheiden || '–'})`)); L.push(''); }
+    if (S.patterns.zu_wenig_belegt.length) { L.push('### Zu wenig belegt', ''); S.patterns.zu_wenig_belegt.forEach(x => L.push('- ' + x)); L.push(''); }
+  }
+  if (S.whatbin) {
+    L.push('## Was bin ich?', '', `**Verhaltensbeschreibung:** ${S.whatbin.verhaltensbeschreibung}`, '');
+    S.whatbin.begriffe.forEach(b => L.push(`### ${b.begriff}: ${b.urteil}`, '', `Definition: ${b.definition}`, '', b.begruendung, '', `- Gestützt auf: ${b.muster_titel.join('; ') || '–'}`, `- Gegenbelege: ${b.gegenbelege || '–'}`, `- Ungewöhnlich: ${b.ungewoehnlich || '–'}`, `- Erlernbar: ${b.erlernbar || '–'}`, ''));
+    if (S.whatbin.anmerkung) L.push(S.whatbin.anmerkung, '');
+  }
+  if (S.spannungen && S.spannungen.items.length) { L.push('## Spannungen zwischen meinen Antworten', ''); S.spannungen.items.forEach(x => L.push(`- ${x.worin}`, `  - „${x.zitat_a}“ (${x.moment_a})${x.a_ok ? '' : ' [nicht wörtlich gefunden]'}`, `  - „${x.zitat_b}“ (${x.moment_b})${x.b_ok ? '' : ' [nicht wörtlich gefunden]'}`)); L.push(''); }
+  if (S.claims.length) { L.push('## Behauptungs-Ledger', ''); ledgerLines().forEach(l => L.push(l)); }
+  L.push('## Was ich nicht beantworten kann', '');
+  collectOpenQs().forEach(q => L.push(q.form === 'unentscheidbar' ? `- (unentscheidbar, bleibt offen) ${q.text}` : `- [${q.done ? 'x' : ' '}] (${q.form}) ${q.text}${q.step ? ' → Mein Schritt: ' + q.step : ''}`));
+  return L.join('\n') + '\n';
+}
+
+/* ============ Erweiterungen (Runde 1) ============ */
+const FORMS = ['beschaffbar', 'experimentierbar', 'unentscheidbar'];
+function normQs(x) {
+  return (Array.isArray(x) ? x : []).map(q => typeof q === 'string' ? {frage:q, form:'', begruendung:''}
+    : {frage:str(q && q.frage), form:FORMS.includes(str(q && q.form).trim().toLowerCase()) ? str(q.form).trim().toLowerCase() : '', begruendung:str(q && q.begruendung)}).filter(q => q.frage);
+}
+function normContradictions(x) {
+  return (Array.isArray(x) ? x : []).map(c => ({muster_a:str(c && c.muster_a), muster_b:str(c && c.muster_b), warum:str(c && c.warum_nicht_beide_wahr), entscheiden:str(c && c.was_entscheiden_wuerde)})).filter(c => c.muster_a && c.muster_b);
+}
+function hashStr(t) { let h = 5381; for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
+function normText(t) { return String(t).toLowerCase().replace(/[„“"'’‚‘»«]/g, '').replace(/\s+/g, ' ').trim(); }
+
+/* --- Widersprüche zwischen Mustern --- */
+function contradictionsHtml(P) {
+  let h = '<h2 style="margin-top:1.4rem">Widersprüche zwischen Mustern</h2>';
+  if (P.widersprueche === undefined) return h + '<p class="muted">Bei dieser Mustersuche wurde noch nicht nach Widersprüchen gefragt. Suche die Muster neu, um sie zu prüfen.</p>';
+  if (!P.widersprueche.length) return h + '<p class="muted">Die KI hat keinen echten Widerspruch genannt. Eine leere Liste ist ein gültiges Ergebnis, aber kein Beweis, dass es keinen gibt.</p>';
+  const titles = P.muster.map(x => x.titel.trim().toLowerCase());
+  return h + '<p class="small muted">Zwei Muster, die nicht beide stimmen können, sagen mehr als zehn, die sich bestätigen. Prüfe, ob die genannten Muster wirklich existieren.</p>' + P.widersprueche.map(c => {
+    const okA = titles.includes(c.muster_a.trim().toLowerCase()), okB = titles.includes(c.muster_b.trim().toLowerCase());
+    return `<div class="card"><p><b>${esc(c.muster_a)}</b> ${okA ? '' : '<span class="chip bad">Muster nicht gefunden</span>'} gegen <b>${esc(c.muster_b)}</b> ${okB ? '' : '<span class="chip bad">Muster nicht gefunden</span>'}</p><p>${esc(c.warum)}</p><p class="small muted">Was entscheiden würde: ${esc(c.entscheiden) || '–'}</p></div>`;
+  }).join('');
+}
+
+/* --- Spannungen zwischen Antworten --- */
+function answerTextFor(m) { return normText([...Object.values(m.answers || {}), ...(m.followups || []).map(f => f.a || ''), m.correction || ''].join(' ')); }
+async function runSpannungen() {
+  const ms = allMoments().filter(m => momentAnswered(m) > 0 || m.correction);
+  if (ms.length < 2) { toast('Für Spannungen brauchst du Antworten zu mindestens zwei Momenten.'); return; }
+  const data = ms.map(m => { const a = {}; momentQuestions(m).forEach(q => { const v = q.get().trim(); if (v) a[q.text] = v.slice(0, 900); }); const o = {id:m.id, datum:m.datum, titel:m.titel, antworten:a}; if (m.correction) o.korrektur_methode = m.correction; return o; });
+  const user = `AUFGABE: Finde Stellen, an denen die Antworten der Person zu verschiedenen Momenten nicht zusammenpassen oder in Spannung stehen (zum Beispiel "wollte ich unbedingt" bei einem Moment und "da reingestolpert" bei einem anderen).
+Regeln:
+- Nur Fundstellen. Keine Wertung, keine Deutung, keine Erklärung, was dahintersteckt.
+- Jede Fundstelle besteht aus zwei wörtlichen Zitaten aus den Antworten (höchstens 15 Wörter je Zitat) mit den Moment-IDs.
+- "worin": ein neutraler Satz, worin sich beide Aussagen unterscheiden.
+- Gibt es keine echte Spannung, ist eine leere Liste die richtige Antwort. Erfinde nichts.
+
+SCHEMA (JSON):
+{"spannungen": [ {"moment_a": "p1-m1", "zitat_a": "...", "moment_b": "p2-m1", "zitat_b": "...", "worin": "..."} ]}
+
+ANTWORTEN:
+${JSON.stringify(data, null, 1)}`;
+  const req = makeReq('Spannungen zwischen Antworten', RULES, user, {hasAnswers:true});
+  if (!(await showPreview('Anfrage senden', [req]))) return;
+  try {
+    const r = parseJSONLoose(await callAI(req, {maxTokens:3000})), all = allMoments();
+    const check = (id, z) => { const m = all.find(x => x.id === id); return !!(m && z && answerTextFor(m).includes(normText(z))); };
+    S.spannungen = {at:new Date().toISOString(), items:(Array.isArray(r.spannungen) ? r.spannungen : []).map(x => ({moment_a:str(x.moment_a), zitat_a:str(x.zitat_a), moment_b:str(x.moment_b), zitat_b:str(x.zitat_b), worin:str(x.worin), a_ok:check(str(x.moment_a), str(x.zitat_a)), b_ok:check(str(x.moment_b), str(x.zitat_b))}))};
+    markDirty(); renderResults();
+  } catch (e) { toast(e.message); }
+}
+function spannungenHtml() {
+  const Sp = S.spannungen, ms = allMoments();
+  let h = `<p class="lede">Fundstellen, an denen deine Antworten zu verschiedenen Momenten nicht zusammenpassen. Das ist kein Urteil: Menschen ändern sich, und oft ist der Unterschied selbst das Material.</p>
+    <div class="actions"><button class="btn primary" id="btnSpan">${Sp ? 'Neu suchen' : 'Spannungen suchen'}</button></div>`;
+  if (!Sp) return h + '<div class="empty">Noch nicht gesucht. Du brauchst Antworten zu mindestens zwei Momenten.</div>';
+  if (!Sp.items.length) return h + '<div class="empty">Keine Spannung genannt. Das ist ein gültiges Ergebnis.</div>';
+  const mt = id => { const m = ms.find(x => x.id === id); return m ? `${m.titel} (${m.datum || fmtDate(momentTs(m))})` : id + ' (unbekannt)'; };
+  const q = (id, z, ok) => `<div class="layer val"><span class="ltag">${esc(mt(id))}</span><p>„${esc(z)}“ <span class="chip ${ok ? 'ok' : 'bad'}">${ok ? 'wörtlich gefunden' : 'nicht wörtlich gefunden'}</span></p></div>`;
+  return h + '<p class="small muted">Jedes Zitat wird gegen deine gespeicherten Antworten geprüft. „Nicht wörtlich gefunden“ heißt: Die KI hat es vermutlich umformuliert oder erfunden.</p>' + Sp.items.map(x => `<div class="card"><p>${esc(x.worin)}</p>${q(x.moment_a, x.zitat_a, x.a_ok)}${q(x.moment_b, x.zitat_b, x.b_ok)}</div>`).join('');
+}
+
+/* --- Offene Fragen: beschaffbar, experimentierbar, unentscheidbar --- */
+function collectOpenQs() {
+  const out = [], T = S.timeline;
+  const add = (src, text, form, by) => {
+    const key = hashStr(src + '|' + text), st = S.openQState[key] || {};
+    out.push({key, src, text, form:st.form || form || 'unentscheidbar', by:st.form ? 'du' : (by || 'regel'), step:st.step || '', done:!!st.done});
+  };
+  if (T) T.gaps.forEach(g => add('Zeitleiste (rechnerisch)', `Keine Artefakte von ${fmtDate(T.weeks[g.from].start)} bis ${fmtDate(T.weeks[g.to].start + 6 * 864e5)}.`, 'beschaffbar', 'regel'));
+  S.phases.filter(p => p.result && p.result.quellenlage !== 'dicht').forEach(p => add('Analyse Phase ' + p.n, `Phase ${p.n}: Quellenlage ${p.result.quellenlage}. ${p.result.quellenlage_hinweis}`.trim(), 'beschaffbar', 'regel'));
+  S.phases.filter(p => p.result).forEach(p => p.result.erwartet_aber_fehlt.forEach(x => add('Analyse Phase ' + p.n, x, 'beschaffbar', 'regel')));
+  const qs = (list, src) => (list || []).forEach(x => { const o = typeof x === 'string' ? {frage:x, form:''} : x; add(src, o.frage, o.form, o.form ? 'ki' : 'regel'); });
+  if (S.patterns) qs(S.patterns.nicht_beantwortbar, 'Mustersuche');
+  if (S.whatbin) qs(S.whatbin.nicht_beantwortbar, 'Begriffsprüfung');
+  return out;
+}
+function openQsHtml() {
+  const qs = collectOpenQs();
+  if (!qs.length) return '<p class="muted">Bisher keine offenen Fragen. Sie entstehen aus Zeitleiste, Analyse und Mustersuche.</p>';
+  const c = f => qs.filter(q => q.form === f).length, done = qs.filter(q => q.done && q.form !== 'unentscheidbar').length;
+  const label = {ki:'von der KI eingestuft', regel:'vorläufig eingestuft', du:'von dir eingestuft'};
+  return `<p><span class="chip">${c('beschaffbar')} beschaffbar</span> <span class="chip">${c('experimentierbar')} experimentierbar</span> <span class="chip">${c('unentscheidbar')} unentscheidbar</span> <span class="chip ok">${done} Aufträge erledigt</span></p>` + qs.map(q => `<div class="card tight"><div class="phase-head"><b>${esc(q.text)}</b><span class="chip">${esc(q.src)}</span></div>
+    <div class="row"><div><label class="f" for="oqf-${q.key}">Form</label><select class="inl" id="oqf-${q.key}" data-oq-form="${q.key}">${FORMS.map(f => `<option value="${f}" ${q.form === f ? 'selected' : ''}>${f}</option>`).join('')}</select></div><span class="chip ${q.by === 'du' ? 'ok' : 'warn'}">${label[q.by]}</span></div>
+    ${q.form === 'unentscheidbar' ? '<p class="small muted">Bleibt offen. Diese Frage gibt das Material nicht her, und sie wird nicht gefüllt. Dafür gibt es keinen Arbeitsauftrag.</p>'
+      : `<label class="f" for="oqs-${q.key}">Mein Arbeitsauftrag</label><input type="text" id="oqs-${q.key}" data-oq-step="${q.key}" value="${esc(q.step)}" placeholder="${q.form === 'beschaffbar' ? 'Was besorgst du, und wo?' : 'Welchen kleinen Test machst du?'}"><label class="f"><input type="checkbox" data-oq-done="${q.key}" ${q.done ? 'checked' : ''}> erledigt</label>`}</div>`).join('');
+}
+function oqSet(key, patch) { S.openQState[key] = Object.assign({}, S.openQState[key], patch); markDirty(); }
+
+/* --- Operationskarte pro Muster --- */
+const OP_FIELDS = [['ausloeser', 'Auslöser'], ['handgriff', 'Handgriff'], ['abbruchbedingung', 'Abbruchbedingung'], ['falsifikation', 'Falsifikation'], ['gegenbeispiel', 'Gegenbeispiel']];
+function opField(f) { f = f && typeof f === 'object' ? f : {}; return {text:str(f.text), ids:arr(f.moment_ids), luecke:str(f.luecke)}; }
+function operationHtml(x, i) {
+  const o = x.operation; if (!o) return '';
+  const ms = allMoments();
+  const ids = f => f.ids.map(id => { const m = ms.find(z => z.id === id); return m ? esc(m.titel) : `<span class="chip bad">${esc(id)}: Quelle prüfen</span>`; }).join('; ');
+  return `<div class="card tight" style="background:var(--surface2)"><h3>Operationskarte</h3>
+    ${OP_FIELDS.map(([k, l]) => { const f = o[k]; return `<p><b>${l}:</b> ${f.text ? esc(f.text) : `<span class="chip warn">nicht belegt</span> <span class="small muted">${esc(f.luecke)}</span>`}${f.ids.length ? `<br><span class="small muted">Momente: ${ids(f)}</span>` : ''}</p>`; }).join('')}
+    <label class="f" for="opt-${i}">Nächster Test (dein Eintrag)</label>
+    <textarea id="opt-${i}" data-optest="${i}" style="min-height:4rem" placeholder="Was probierst du als Nächstes aus? Das trägst nur du ein.">${esc(o.naechster_test)}</textarea>
+    <p class="small muted">Stand ${new Date(o.at).toLocaleDateString('de-DE')}. Das ist eine Hypothese aus deinen Momenten, kein bewiesenes Verfahren.</p>
+    <button class="btn small" data-opmd="${i}">Ein-Seiten-Karte herunterladen</button></div>`;
+}
+async function runOperation(pt) {
+  const all = allMoments(), ms = pt.moment_ids.map(id => all.find(m => m.id === id)).filter(Boolean);
+  if (!ms.length) { toast('Die Momente dieses Musters gibt es in der aktuellen Analyse nicht mehr.'); return; }
+  const data = ms.map(m => { const o = JSON.parse(momentBrief(m, true)); o.id = m.id; return o; });
+  const user = `AUFGABE: Erstelle aus diesem Muster eine Operationskarte: eine wiederholbare Handlung, die aus den belegten Momenten hervorgeht.
+Felder:
+- ausloeser: Woran zeigt sich in den Momenten, dass dieses Muster gerade greift?
+- handgriff: Was hat die Person in diesen Momenten tatsächlich getan?
+- abbruchbedingung: Woran ließe sich erkennen, dass Weitermachen nur noch Sunk Cost wäre? Nur aus dem Material ableiten.
+- falsifikation: Was hätte die Annahme früher widerlegt? Nutze die Falsifizierbarkeits-Angaben der Momente.
+- gegenbeispiel: Ein Moment, in dem dieselbe Abfolge nicht funktioniert hat oder nicht angewandt wurde.
+Regeln:
+- Jedes Feld nennt die Moment-IDs, auf die es sich stützt.
+- Steht im Material nichts dazu, bleibt "text" leer und "luecke" erklärt in einem Satz, was fehlt. Ergänze nichts, was nicht im Material steht.
+- Keine Empfehlung, was die Person künftig tun soll. Es gibt kein Feld für den nächsten Test, den trägt die Person selbst ein.
+
+SCHEMA (JSON):
+{"ausloeser": {"text": "", "moment_ids": [], "luecke": ""}, "handgriff": {"text": "", "moment_ids": [], "luecke": ""}, "abbruchbedingung": {"text": "", "moment_ids": [], "luecke": ""}, "falsifikation": {"text": "", "moment_ids": [], "luecke": ""}, "gegenbeispiel": {"text": "", "moment_ids": [], "luecke": ""}}
+
+MUSTER:
+${JSON.stringify({titel:pt.titel, beobachtung:pt.beobachtung, belege:pt.belege, gegenbelege:pt.gegenbelege, alternativerklaerungen:pt.alternativerklaerungen})}
+
+MOMENTE:
+${JSON.stringify(data, null, 1)}`;
+  const req = makeReq('Operationskarte: ' + pt.titel, RULES, user, {hasAnswers:true});
+  if (!(await showPreview('Anfrage senden', [req]))) return;
+  try {
+    const r = parseJSONLoose(await callAI(req, {maxTokens:2500})), old = pt.operation;
+    pt.operation = {at:new Date().toISOString(), naechster_test:old ? old.naechster_test : ''};
+    OP_FIELDS.forEach(([k]) => pt.operation[k] = opField(r[k]));
+    markDirty(); renderResults();
+  } catch (e) { toast(e.message); }
+}
+function operationLines(pt) {
+  const o = pt.operation, L = []; if (!o) return L;
+  L.push(`- Operationskarte (Stand ${isoDate(Date.parse(o.at))}):`);
+  OP_FIELDS.forEach(([k, l]) => { const f = o[k]; L.push(`  - ${l}: ${f.text || '(nicht belegt' + (f.luecke ? ': ' + f.luecke : '') + ')'}${f.ids.length ? ' [' + f.ids.join(', ') + ']' : ''}`); });
+  L.push(`  - Nächster Test (mein Eintrag): ${o.naechster_test || '–'}`);
+  return L;
+}
+function operationCardMd(pt) {
+  const o = pt.operation, ms = allMoments();
+  const L = [`# Operationskarte: ${pt.titel}`, '', `Stand: ${isoDate(Date.parse(o.at))}. Hypothese aus meinen eigenen Momenten, nicht bewiesen.`, ''];
+  OP_FIELDS.forEach(([k, l]) => {
+    const f = o[k]; L.push(`## ${l}`, '', f.text || '(nicht belegt' + (f.luecke ? ': ' + f.luecke : '') + ')', '');
+    if (f.ids.length) L.push('Momente: ' + f.ids.map(id => { const m = ms.find(z => z.id === id); return m ? m.titel + ' (' + id + ')' : id + ' (nicht mehr vorhanden)'; }).join('; '), '');
+  });
+  L.push('## Nächster Test (mein Eintrag)', '', o.naechster_test || '–', '', '## Zugrunde liegendes Muster', '', pt.beobachtung, '', 'Gegenbelege:');
+  pt.gegenbelege.forEach(g => L.push('- ' + g)); L.push('');
+  return L.join('\n');
+}
+
+/* --- Behauptungs-Ledger --- */
+function newClaim() { return {id:'c' + Date.now().toString(36) + Math.floor(Math.random() * 1000), text:'', momentIds:[], counter:'', checked:'', status:'dünn'}; }
+function claimWarnings(c) {
+  const w = [], ms = allMoments();
+  if (!c.text.trim()) w.push('Die Behauptung ist noch leer.');
+  if (c.status === 'belegbar' && c.momentIds.length < 2) w.push('Status „belegbar“, aber weniger als zwei Momente als Beleg.');
+  if (c.status === 'belegbar' && !c.counter.trim()) w.push('Status „belegbar“, aber keine Gegenbelege eingetragen.');
+  if (c.status !== 'widerrufen') {
+    if (!c.checked) w.push('Noch nie geprüft.');
+    else if ((Date.now() - Date.parse(c.checked)) / 864e5 > 90) w.push('Die letzte Prüfung liegt mehr als 90 Tage zurück.');
+  }
+  const missing = c.momentIds.filter(id => !ms.some(m => m.id === id));
+  if (missing.length) w.push(missing.length + ' gewählte Momente gibt es in der aktuellen Analyse nicht mehr.');
+  return w;
+}
+function claimsHtml() {
+  const ms = allMoments();
+  const h = `<p class="lede">Alles, was du nach außen sagen willst, braucht Belege, Gegenbelege und ein Prüfdatum. Du trägst es selbst ein. Die KI füllt hier nichts vor und vergibt keinen Status. Die Hinweise unter jeder Behauptung rechnet das Tool aus deinen Einträgen aus.</p>
+    <div class="actions"><button class="btn primary" id="btnClaimAdd">Behauptung hinzufügen</button>${S.claims.length ? '<button class="btn" id="btnClaimMd">Ledger als Markdown herunterladen</button>' : ''}</div>`;
+  if (!S.claims.length) return h + '<div class="empty">Noch keine Behauptungen. Beispiel: „Mein System prüft Ergebnisse, bevor es sie meldet.“</div>';
+  return h + S.claims.map(c => `<div class="card" data-claim="${c.id}">
+    <label class="f" for="ct-${c.id}">Behauptung</label><textarea id="ct-${c.id}" data-cf="text" style="min-height:3.5rem">${esc(c.text)}</textarea>
+    <details><summary data-csum>Belegende Momente (${c.momentIds.length} gewählt)</summary><div class="checks">${ms.length ? ms.map(m => `<label><input type="checkbox" data-cmom="${m.id}" ${c.momentIds.includes(m.id) ? 'checked' : ''}> ${esc(m.titel)} <span class="muted small">${esc(m.datum || '')} · ${esc(m.id)}</span></label>`).join('') : '<p class="small muted">Noch keine Momente. Sie entstehen in der Analyse.</p>'}</div></details>
+    <label class="f" for="cg-${c.id}">Gegenbelege</label><textarea id="cg-${c.id}" data-cf="counter" style="min-height:3.5rem">${esc(c.counter)}</textarea>
+    <div class="row"><div><label class="f" for="cd-${c.id}">Zuletzt geprüft</label><input type="date" id="cd-${c.id}" data-cf="checked" value="${esc(c.checked)}"></div><button class="btn small" data-ctoday="1">Heute geprüft</button>
+      <div><label class="f" for="cs-${c.id}">Status</label><select class="inl" id="cs-${c.id}" data-cf="status">${['belegbar', 'dünn', 'widerrufen'].map(x => `<option ${c.status === x ? 'selected' : ''}>${x}</option>`).join('')}</select></div>
+      <button class="btn small danger" data-cdel="1">Entfernen</button></div>
+    <div class="cw">${claimWarnings(c).map(x => `<div class="notice">${esc(x)}</div>`).join('')}</div></div>`).join('');
+}
+function ledgerLines() {
+  const L = [], ms = allMoments();
+  S.claims.forEach(c => {
+    L.push(`### ${c.text.trim() || '(leer)'}`, '', `- Status: ${c.status}, zuletzt geprüft: ${c.checked || 'nie'}`,
+      `- Belegende Momente: ${c.momentIds.map(id => { const m = ms.find(z => z.id === id); return m ? m.titel + ' (' + id + ')' : id + ' (nicht mehr vorhanden)'; }).join('; ') || '–'}`,
+      `- Gegenbelege: ${c.counter.trim() || '–'}`);
+    claimWarnings(c).forEach(w => L.push('- Hinweis: ' + w)); L.push('');
+  });
+  return L;
+}
+
+/* --- Verdrahtung im Ergebnis-Bereich --- */
+function bindResultsExtras(el) {
+  const on = (sel, fn) => { const x = $(sel, el); if (x) x.onclick = fn; };
+  on('#btnSpan', runSpannungen);
+  $$('[data-oppat]', el).forEach(b => b.onclick = () => runOperation(S.patterns.muster[+b.dataset.oppat]));
+  $$('[data-optest]', el).forEach(t => t.oninput = () => { S.patterns.muster[+t.dataset.optest].operation.naechster_test = t.value; markDirty(); });
+  $$('[data-opmd]', el).forEach(b => b.onclick = () => { const pt = S.patterns.muster[+b.dataset.opmd]; download('operationskarte-' + (pt.titel.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'muster') + '.md', operationCardMd(pt), 'text/markdown'); });
+  $$('[data-oq-form]', el).forEach(x => x.onchange = () => { oqSet(x.dataset.oqForm, {form:x.value}); renderResults(); });
+  $$('[data-oq-step]', el).forEach(x => x.oninput = () => oqSet(x.dataset.oqStep, {step:x.value}));
+  $$('[data-oq-done]', el).forEach(x => x.onchange = () => oqSet(x.dataset.oqDone, {done:x.checked}));
+  on('#btnClaimAdd', () => { S.claims.push(newClaim()); markDirty(); renderResults(); });
+  on('#btnClaimMd', () => download('genesis-behauptungs-ledger-' + isoDate(Date.now()) + '.md', ['# Behauptungs-Ledger', '', 'Stand: ' + isoDate(Date.now()) + '. Alle Einträge stammen von mir.', '', ...ledgerLines()].join('\n') + '\n', 'text/markdown'));
+  $$('[data-claim]', el).forEach(card => {
+    const c = S.claims.find(x => x.id === card.dataset.claim); if (!c) return;
+    const refresh = () => { $('.cw', card).innerHTML = claimWarnings(c).map(x => `<div class="notice">${esc(x)}</div>`).join(''); $('[data-csum]', card).textContent = `Belegende Momente (${c.momentIds.length} gewählt)`; };
+    $$('[data-cf]', card).forEach(i => i.addEventListener((i.tagName === 'SELECT' || i.type === 'date') ? 'change' : 'input', () => { c[i.dataset.cf] = i.value; markDirty(); refresh(); }));
+    $$('[data-cmom]', card).forEach(i => i.onchange = () => { const id = i.dataset.cmom; c.momentIds = i.checked ? [...new Set([...c.momentIds, id])] : c.momentIds.filter(x => x !== id); markDirty(); refresh(); });
+    $('[data-ctoday]', card).onclick = () => { c.checked = isoDate(Date.now()); $('[data-cf="checked"]', card).value = c.checked; markDirty(); refresh(); };
+    $('[data-cdel]', card).onclick = () => { if (confirm('Diese Behauptung entfernen?')) { S.claims = S.claims.filter(x => x !== c); markDirty(); renderResults(); } };
+  });
+}
+
+/* ============ Projekt sichern und laden ============ */
+function saveProject() {
+  const c = S.settings;
+  const proj = {app:'genesis', v:1, savedAt:new Date().toISOString(), settings:{provider:c.provider, url:c.url, model:c.model, weeksPerPhase:c.weeksPerPhase, charsPerPhase:c.charsPerPhase},
+    timeline:S.timeline,
+    phases:S.phases.map(p => ({id:p.id, n:p.n, from:p.from, to:p.to, wFirst:p.wFirst, wLast:p.wLast, counts:p.counts, stats:{n:p.itemIds.length || (p.stats && p.stats.n) || 0}, sources:p.sources, status:p.status, result:p.result, digestNote:p.digestNote})),
+    patterns:S.patterns, whatbin:S.whatbin, spannungen:S.spannungen, openQState:S.openQState, claims:S.claims, sendLog:S.sendLog};
+  const d = new Date(); download(`genesis-${isoDate(d)}-${pad(d.getHours())}${pad(d.getMinutes())}.json`, JSON.stringify(proj, null, 1), 'application/json');
+  S.dirty = false; $('#saveBtn').classList.remove('dirty'); toast('Projekt gesichert. Deinen API-Key und dein Rohmaterial enthält die Datei nicht.');
+}
+async function loadProjectFile(file, asCompare) {
+  if (!file) return;
+  try {
+    const p = JSON.parse(await file.text());
+    if (p.app !== 'genesis') throw new Error('Das ist keine Genesis-Projektdatei.');
+    if (asCompare) { S.compare = p; renderResults(); return; }
+    if (S.dirty && !confirm('Ungesicherte Änderungen gehen verloren. Trotzdem laden?')) return;
+    Object.assign(S.settings, {provider:p.settings.provider, url:p.settings.url, model:p.settings.model, weeksPerPhase:p.settings.weeksPerPhase, charsPerPhase:p.settings.charsPerPhase});
+    S.timeline = p.timeline; S.items = []; S.itemById = new Map(); S.files = []; S.fileKeys = new Set(); S.byWeek = new Map();
+    S.phases = (p.phases || []).map(x => Object.assign({itemIds:[], status:x.status || 'offen', error:null}, x));
+    S.patterns = p.patterns || null; S.whatbin = p.whatbin || null; S.sendLog = p.sendLog || [];
+    S.spannungen = p.spannungen || null; S.openQState = p.openQState || {}; S.claims = p.claims || [];
+    S.dirty = false; $('#saveBtn').classList.remove('dirty'); S.ui.momentId = null; S.ui.tab = 'A';
+    toast('Projekt geladen. Für neue Analysen muss das Material wieder eingelesen sein.');
+    go(S.patterns ? 'results' : (allMoments().length ? 'interview' : 'timeline'));
+  } catch (e) { toast('Laden fehlgeschlagen: ' + e.message); }
+}
+
+/* ============ Einstellungen ============ */
+function initSettings() {
+  // Shared key/endpoint with ALEX Prompt- & Content-Studio (same browser)
+  try {
+    const sharedKey = localStorage.getItem('deepseek_api_key') || '';
+    const sharedUrl = localStorage.getItem('deepseek_api_endpoint') || '';
+    if (sharedKey && !S.settings.key) S.settings.key = sharedKey;
+    if (sharedUrl && S.settings.provider === 'deepseek') S.settings.url = sharedUrl;
+  } catch (e) { /* localStorage may be blocked */ }
+
+  const sel = $('#stProvider'); sel.innerHTML = Object.entries(PROVIDERS).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join('');
+  const fill = () => { const c = S.settings; sel.value = c.provider; $('#stModel').value = c.model; $('#stUrl').value = c.url; $('#stKey').value = c.key; $('#stPriceIn').value = c.priceIn; $('#stPriceOut').value = c.priceOut; $('#stWeeks').value = c.weeksPerPhase; $('#stChars').value = c.charsPerPhase; };
+  sel.onchange = () => { const P = PROVIDERS[sel.value]; $('#stUrl').value = P.url; $('#stModel').value = P.model; };
+  $('#btnSettings').onclick = () => { fill(); $('#dlgSettings').showModal(); };
+  $('#stClose').onclick = () => {
+    const c = S.settings, oldW = c.weeksPerPhase;
+    c.provider = sel.value; c.url = $('#stUrl').value.trim(); c.model = $('#stModel').value.trim(); c.key = $('#stKey').value.trim();
+    c.priceIn = $('#stPriceIn').value; c.priceOut = $('#stPriceOut').value;
+    c.weeksPerPhase = Math.min(12, Math.max(1, +$('#stWeeks').value || 4)); c.charsPerPhase = Math.min(120000, Math.max(6000, +$('#stChars').value || 24000));
+    try {
+      if (c.provider === 'deepseek' && c.key) {
+        localStorage.setItem('deepseek_api_key', c.key);
+        if (c.url) localStorage.setItem('deepseek_api_endpoint', c.url);
+      }
+    } catch (e) {}
+    $('#dlgSettings').close();
+    if (oldW !== c.weeksPerPhase && S.timeline) toast('Phasenlänge geändert. Sie gilt nach „Zeitleiste neu berechnen“ in Schritt 1.');
+  };
+  fill();
+}
+
+/* ============ Start ============ */
+function init() {
+  initSettings();
+  $$('#steps button').forEach(b => b.onclick = () => go(b.dataset.go));
+  $('#saveBtn').onclick = saveProject;
+  $('#loadProj').onchange = e => { loadProjectFile(e.target.files[0], false); e.target.value = ''; };
+  $('#btnBuild').onclick = rebuildTimeline;
+  $('#copyGit').onclick = () => { navigator.clipboard.writeText($('#gitCmd').textContent).then(() => toast('Befehl kopiert.'), () => toast('Kopieren nicht möglich. Markiere den Befehl von Hand.')); };
+  $('#pvCancel').onclick = () => $('#dlgPreview').close('cancel');
+  $('#pvSend').onclick = () => $('#dlgPreview').close('send');
+  const drop = $('#drop');
+  ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', async e => { const entries = await collectFromDataTransfer(e.dataTransfer); ingest(entries); });
+  const fromInput = e => { const l = [...e.target.files].map(f => ({file:f, path:f.webkitRelativePath || f.name})); e.target.value = ''; ingest(l); };
+  $('#pickDir').onchange = fromInput; $('#pickFiles').onchange = fromInput;
+  window.addEventListener('dragover', e => e.preventDefault()); window.addEventListener('drop', e => e.preventDefault());
+  go('import');
+}
+init();
+</script>
+</body>
+</html>
