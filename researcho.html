@@ -454,7 +454,7 @@ function handleContextFileUpload(e) {
   reader.onload = (ev) => { $('context-text').value = ev.target.result || ''; updateContextWordCount(); };
   reader.readAsText(file);
 }
-$_wireContextInput = () => $('context-text').addEventListener('input', updateContextWordCount);
+function wireContextInput() { $('context-text').addEventListener('input', updateContextWordCount); }
 function updateContextWordCount() {
   const t = $('context-text').value.trim();
   $('context-word-count').textContent = t ? (t.split(/\s+/).length + ' Wörter bereit zur Analyse') : 'Noch kein Text eingegeben';
@@ -988,7 +988,7 @@ function handlePersonaFileUpload(e) {
 
 /* ---------- Init ---------- */
 loadState();
-$_wireContextInput();
+wireContextInput();
 </script>
 </body>
 </html>
