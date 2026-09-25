@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="de" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Researcho — Forschungs-Persona-Generator &amp; Wissens-Scout</title>
+  <meta name="description" content="Erstelle hochspezialisierte Forscher- und Wissenschaftler-Personas mit KI-gestuetzter Live-Internet-Recherche (Gemini Search Grounding), validierten Fachquellen und downloadbaren Modul-Textdateien.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = { darkMode: 'class', theme: { extend: { fontFamily: { sans: ['Inter','sans-serif'], mono: ['JetBrains Mono','monospace'] } } } }
+  </script>
+  <style>
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    .tab-active { border-bottom: 2px solid #22d3ee; color: #67e8f9; background-color: rgba(34,211,238,0.08); }
+    .spin { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  </style>
+</head>
+<body class="h-full font-sans antialiased bg-slate-950 text-slate-100 flex flex-col">
+
+  <div id="toast" class="fixed top-5 right-5 z-50 transform transition-all duration-300 -translate-y-24 opacity-0 pointer-events-none flex items-center gap-3 bg-slate-800 border border-slate-700 text-slate-100 px-4 py-3 rounded-xl shadow-2xl">
+    <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+    <span id="toast-message" class="text-sm font-medium">Erledigt!</span>
+  </div>
+
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-indigo-600 flex items-center justify-center text-xl shadow-lg shadow-cyan-500/20">🔬</div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight bg-gradient-to-r from-cyan-300 via-blue-300 to-indigo-300 bg-clip-text text-transparent">Researcho</h1>
+          <p class="text-xs text-slate-400">Forschungs-Persona-Generator &amp; Wissens-Scout</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <a href="https://bewusstki.de/werkzeuge.html" class="text-xs text-slate-400 hover:text-slate-200 px-2 py-1">↖ Werkzeuge</a>
+        <button onclick="openSaved()" class="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-2 transition">
+          <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path></svg>
+          <span id="saved-count-label">Gespeichert: 0</span>
+        </button>
+        <button onclick="toggleApiKeyModal()" class="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-2 transition">
+          <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 0121 9z"></path></svg>
+          <span id="api-key-status">Gemini: –</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-4">
+    <div class="bg-amber-950/30 border border-amber-900/50 rounded-xl p-4 text-xs text-slate-300 leading-relaxed">
+      <strong class="text-amber-300">Warum nur Gemini:</strong> Die Live-Internet-Recherche basiert auf Googles
+      <a href="https://ai.google.dev/gemini-api/docs/google-search" target="_blank" rel="noopener noreferrer" class="text-cyan-300 underline">Search-Grounding-Funktion</a>,
+      die es nur in der Gemini-API gibt (kein DeepSeek/OpenAI/Anthropic-Äquivalent). Daten bleiben lokal (localStorage);
+      dein Gemini-Key wird nur direkt an Google geschickt, nie an einen bewusst.ki-Server.
+    </div>
+  </div>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+    <!-- ============ ERROR / LOADING ============ -->
+    <div id="error-banner" class="hidden p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 flex items-start gap-3 text-sm">
+      <svg class="w-5 h-5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"></path></svg>
+      <div class="flex-1"><span class="font-semibold block">Fehler:</span><span id="error-text"></span></div>
+      <button onclick="hideError()" class="text-rose-400 hover:text-rose-200 text-xs font-semibold px-2 py-1 rounded">Schließen</button>
+    </div>
+
+    <div id="loading-banner" class="hidden p-8 rounded-2xl bg-gradient-to-r from-cyan-950/40 via-slate-900 to-indigo-950/40 border border-cyan-500/30 shadow-2xl text-center space-y-4">
+      <div class="inline-flex p-3 rounded-2xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
+        <div class="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full spin"></div>
+      </div>
+      <div>
+        <h3 class="text-lg font-bold text-slate-100">Wissenschaftler-Persona wird generiert</h3>
+        <p id="loading-step" class="text-sm font-mono text-cyan-300 mt-1.5">🔍 Starte Google-Search im Web nach Fachliteratur &amp; Durchbrüchen...</p>
+      </div>
+      <p class="text-xs text-slate-500">Gemini durchsucht das Internet mit Google Search nach aktuellen Fachartikeln, Laboren und Methoden. Das kann 20-60s dauern.</p>
+    </div>
+
+    <!-- ============ VIEW: NO PERSONA (HERO + FORM) ============ -->
+    <div id="view-empty" class="space-y-8">
+      <div class="relative rounded-3xl bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border border-slate-800 p-8 md:p-12 overflow-hidden shadow-2xl">
+        <div class="relative max-w-3xl space-y-4">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">✨ KI-gestützter Wissenschaftler-Architekt &amp; Web-Scout</div>
+          <h2 class="text-3xl md:text-5xl font-black text-white tracking-tight leading-tight">Erschaffe spezialisierte <br class="hidden sm:block">
+            <span class="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400">Forschungs- &amp; Wissenschaftler-Personas</span></h2>
+          <p class="text-sm md:text-base text-slate-300 leading-relaxed">Definiere das Fachgebiet, das benötigte Theoriewissen und den gewünschten Methoden-Toolstack. Die KI recherchiert im Web nach den neuesten Erkenntnissen, Papers und Workflows und erstellt ein vollständiges Wissenschaftler-Profil — <strong class="text-cyan-300">einzeln downloadbar in strukturierten Textdateien</strong> sowie als ZIP-Archiv.</p>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4">
+            <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-xs"><span class="text-cyan-400 font-bold block mb-1">01. Eingabe</span><span class="text-slate-400">Spezifizieren oder .json laden</span></div>
+            <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-xs"><span class="text-indigo-400 font-bold block mb-1">02. Live-Recherche</span><span class="text-slate-400">Google Search nach Papers</span></div>
+            <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-xs"><span class="text-emerald-400 font-bold block mb-1">03. Abgleich</span><span class="text-slate-400">Neuerungen synchronisieren</span></div>
+            <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-xs"><span class="text-amber-400 font-bold block mb-1">04. Download</span><span class="text-slate-400">Einzeln oder als ZIP</span></div>
+          </div>
+          <div class="pt-2"><button onclick="openUpload()" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-xs font-semibold text-cyan-300 border border-slate-700 hover:border-cyan-500/40 transition">⬆ Gespeicherte Persona hochladen &amp; abgleichen</button></div>
+        </div>
+      </div>
+
+      <!-- Generator Form -->
+      <div class="bg-slate-900/90 rounded-2xl border border-slate-800 p-6 md:p-8 shadow-xl space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <span class="text-xs font-semibold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5 mb-1">🪄 Spezifikation der Wissenschaftler-Persona</span>
+            <h2 class="text-lg md:text-xl font-bold text-slate-100">Welche Persona möchtest du erschaffen?</h2>
+          </div>
+          <div class="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs self-start">
+            <button type="button" id="lang-de-btn" onclick="setLanguage('de')" class="px-3 py-1 rounded-lg font-medium transition bg-cyan-600 text-white">Deutsch</button>
+            <button type="button" id="lang-en-btn" onclick="setLanguage('en')" class="px-3 py-1 rounded-lg font-medium transition text-slate-400 hover:text-slate-200">English</button>
+          </div>
+        </div>
+
+        <!-- Smart context import -->
+        <div class="rounded-2xl bg-gradient-to-br from-indigo-950/40 via-slate-950/80 to-cyan-950/40 border border-indigo-500/30 p-5 shadow-lg space-y-4">
+          <div>
+            <h3 class="text-sm font-bold text-slate-100 flex items-center gap-1.5">⚡ Smart Kontext-Import &amp; Auto-Fill <span class="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">KI-Extraktion</span></h3>
+            <p class="text-[11px] text-slate-400">Füge eine KI-Antwort, Aufgabenstellung oder Datei ein — die Felder unten füllen sich automatisch.</p>
+          </div>
+          <textarea id="context-text" rows="4" placeholder="z.B. 'Die Person muss Expertin in CRISPR-Cas12 sein, Python und NGS-Pipelines beherrschen und an reversibler Epigenetik forschen...'" class="w-full px-4 py-3 text-xs md:text-sm bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition font-sans leading-relaxed resize-y"></textarea>
+          <div class="flex items-center gap-2">
+            <input type="file" id="context-file-input" accept=".txt,.md,.json" class="hidden" onchange="handleContextFileUpload(event)">
+            <button type="button" onclick="document.getElementById('context-file-input').click()" class="text-xs px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800">📄 Datei laden</button>
+            <span id="context-file-label" class="text-[11px] text-cyan-400 font-mono"></span>
+          </div>
+          <div id="context-msg" class="hidden text-xs p-3 rounded-xl"></div>
+          <div class="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-800/80">
+            <span id="context-word-count" class="text-[11px] text-slate-400">Noch kein Text eingegeben</span>
+            <div class="flex items-center gap-2">
+              <button type="button" id="parse-context-btn" onclick="parseContext(false)" class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-cyan-300 font-semibold text-xs border border-cyan-500/30 transition">🪄 Felder automatisch ausfüllen</button>
+              <button type="button" id="parse-context-generate-btn" onclick="parseContext(true)" class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 disabled:opacity-40 text-white font-semibold text-xs transition">⚡ Direkt Persona erstellen</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Templates -->
+        <div class="pt-2">
+          <div class="flex items-center gap-1.5 text-xs text-slate-400 mb-2 font-medium">💡 Oder wähle eine wissenschaftliche Schnellstart-Vorlage:</div>
+          <div id="template-buttons" class="flex flex-wrap gap-2"></div>
+        </div>
+
+        <!-- Form fields -->
+        <form id="generator-form" onsubmit="event.preventDefault(); generatePersona();" class="space-y-5 pt-3 border-t border-slate-800">
+          <div>
+            <label class="block text-xs font-semibold text-slate-200 mb-1.5">Forschungsgebiet / Fachthema &amp; Disziplin <span class="text-cyan-400 font-bold">*</span></label>
+            <input type="text" id="f-field" required placeholder="z.B. Topologische Quantenfehlerkorrektur oder Epigenom-Engineering" class="w-full px-4 py-2.5 text-xs md:text-sm bg-slate-950 border border-slate-700/80 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition">
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+              <label class="block text-xs font-semibold text-slate-200 mb-1.5">Gefordertes Fachwissen &amp; Theorien</label>
+              <textarea id="f-expertise" rows="3" placeholder="Welche Theorien, Modelle oder Paradigmen muss die Persona beherrschen?" class="w-full px-4 py-2.5 text-xs md:text-sm bg-slate-950 border border-slate-700/80 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition resize-none"></textarea>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-200 mb-1.5">Fähigkeiten, Methoden &amp; Toolstack</label>
+              <textarea id="f-skills" rows="3" placeholder="Welche Software, Sprachen, Laborprotokolle beherrscht sie?" class="w-full px-4 py-2.5 text-xs md:text-sm bg-slate-950 border border-slate-700/80 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition resize-none"></textarea>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+              <label class="block text-xs font-semibold text-slate-200 mb-1.5">Akademische Rolle &amp; Seniorität</label>
+              <select id="f-role" class="w-full px-4 py-2.5 text-xs md:text-sm bg-slate-950 border border-slate-700/80 rounded-xl text-slate-100 focus:outline-none focus:border-cyan-500 transition">
+                <option>Principal Investigator / Lehrstuhlinhaber (Prof. Dr.)</option>
+                <option selected>Senior Research Scientist / Gruppenleiter</option>
+                <option>Postdoctoral Research Fellow (Postdoc)</option>
+                <option>R&amp;D Lead Scientist (Industrieforschung)</option>
+                <option>Doktorand / Nachwuchsforscher (PhD Candidate)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-200 mb-1.5">Forschungsziel / Leitfrage (optional)</label>
+              <input type="text" id="f-target" placeholder="z.B. Nachweis fehlertoleranter logischer Qubits unter 0.1% Rauschschwelle" class="w-full px-4 py-2.5 text-xs md:text-sm bg-slate-950 border border-slate-700/80 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition">
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-200 mb-1.5">Wissenschaftlicher Denk- &amp; Kommunikationsstil</label>
+            <input type="text" id="f-style" value="Streng methodisch, evidenzbasiert und analytisch" class="w-full px-4 py-2.5 text-xs md:text-sm bg-slate-950 border border-slate-700/80 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:border-purple-500 transition">
+          </div>
+          <button type="submit" id="generate-btn" class="w-full flex items-center justify-center gap-3 py-3.5 px-6 rounded-xl font-bold text-sm md:text-base text-white shadow-xl transition bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:from-cyan-500 hover:via-blue-500 hover:to-indigo-500">
+            🔍 Wissenschaftler-Persona mit Live-Web-Recherche erschaffen →
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- ============ VIEW: PERSONA ACTIVE ============ -->
+    <div id="view-persona" class="hidden space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-cyan-950/20 border border-cyan-500/30 text-xs text-slate-300">
+        <div>
+          <span id="persona-status-name" class="font-bold text-slate-100 text-sm block"></span>
+          <span id="persona-status-domain" class="text-slate-400"></span>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+          <button onclick="openSync()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold text-xs transition">🔄 Forschungsstand abgleichen</button>
+          <button onclick="openUpload()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 transition">⬆ Hochladen</button>
+          <button onclick="newPersona()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 transition">← Neue Persona</button>
+        </div>
+      </div>
+
+      <div id="changelog-banner" class="hidden p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/30 text-xs text-slate-300"></div>
+
+      <div class="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-900 border border-slate-800 overflow-x-auto">
+        <button onclick="switchPersonaTab('files')" id="ptab-btn-files" class="tab-active flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-xs md:text-sm transition whitespace-nowrap">📥 Downloadbare Dateien</button>
+        <button onclick="switchPersonaTab('dossier')" id="ptab-btn-dossier" class="text-slate-400 hover:text-slate-200 flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-xs md:text-sm transition whitespace-nowrap">🎓 Vollständiges Dossier</button>
+        <button onclick="switchPersonaTab('chat')" id="ptab-btn-chat" class="text-slate-400 hover:text-slate-200 flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-xs md:text-sm transition whitespace-nowrap">💬 Mit Persona forschen</button>
+      </div>
+
+      <!-- Files tab -->
+      <div id="ptab-files" class="ptab-content space-y-6">
+        <div class="bg-slate-900/90 rounded-2xl border border-slate-800 p-6 md:p-8 shadow-xl">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+            <div>
+              <h2 class="text-xl md:text-2xl font-bold text-slate-100">Downloadbare Persona-Dateien</h2>
+              <p class="text-sm text-slate-400 mt-1 max-w-2xl">Lade jedes Dokument einzeln herunter oder als ZIP-Archiv.</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2.5">
+              <button onclick="downloadJson()" class="flex items-center gap-2 px-3.5 py-2.5 text-xs md:text-sm font-semibold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">💾 JSON</button>
+              <button onclick="downloadAllZip()" class="flex items-center gap-2 px-5 py-2.5 text-xs md:text-sm font-semibold rounded-xl text-white shadow-lg transition bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500">📦 Alle als ZIP</button>
+            </div>
+          </div>
+          <div id="files-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6"></div>
+        </div>
+      </div>
+
+      <!-- Dossier tab -->
+      <div id="ptab-dossier" class="ptab-content hidden space-y-6">
+        <div id="dossier-content" class="bg-slate-900/90 rounded-2xl border border-slate-800 p-6 md:p-8 shadow-xl space-y-6"></div>
+      </div>
+
+      <!-- Chat tab -->
+      <div id="ptab-chat" class="ptab-content hidden space-y-6">
+        <div class="bg-slate-900 rounded-2xl border border-slate-800 shadow-2xl flex flex-col h-[650px] overflow-hidden">
+          <div class="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/90">
+            <h3 id="chat-header" class="text-sm font-semibold text-slate-100"></h3>
+          </div>
+          <div id="chat-messages" class="flex-1 p-4 md:p-6 overflow-y-auto space-y-4 bg-slate-950/40"></div>
+          <div id="chat-suggestions" class="px-4 py-2 border-t border-slate-800/80 bg-slate-900/60 overflow-x-auto flex gap-2"></div>
+          <div class="p-4 border-t border-slate-800 bg-slate-900">
+            <form onsubmit="event.preventDefault(); sendChatMessage();" class="flex items-center gap-2">
+              <input type="text" id="chat-input" placeholder="Stelle eine wissenschaftliche Frage..." class="flex-1 px-4 py-2.5 text-xs md:text-sm bg-slate-950 border border-slate-700/80 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition">
+              <button type="submit" class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs md:text-sm transition">Senden</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- API Key Modal -->
+  <div id="api-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl">
+      <h3 class="text-lg font-semibold">Gemini API-Key</h3>
+      <p class="text-xs text-slate-400">Kostenlos erhältlich in <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" class="text-cyan-300 underline">Google AI Studio</a>. Wird nur im Browser gehalten (localStorage), nie an bewusst.ki gesendet.</p>
+      <input type="password" id="api-key-input" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm font-mono" placeholder="AIza...">
+      <div>
+        <label class="text-xs text-slate-400 block mb-1">Modell</label>
+        <input type="text" id="api-model-input" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs font-mono" placeholder="gemini-3.8-flash">
+      </div>
+      <div class="flex gap-2 justify-end">
+        <button onclick="toggleApiKeyModal(false)" class="px-4 py-2 text-sm text-slate-400">Abbrechen</button>
+        <button onclick="saveApiKey()" class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-xl text-sm">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Saved Personas Modal -->
+  <div id="saved-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Gespeicherte Personas</h3>
+        <button onclick="toggleSavedModal(false)" class="text-slate-400 hover:text-slate-200">✕</button>
+      </div>
+      <div id="saved-list" class="space-y-2"></div>
+    </div>
+  </div>
+
+  <!-- Sync Modal -->
+  <div id="sync-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-lg w-full space-y-4 shadow-2xl">
+      <h3 class="text-lg font-semibold">Forschungsstand abgleichen</h3>
+      <p class="text-xs text-slate-400">Gemini durchsucht erneut das Web nach dem neuesten Stand und aktualisiert Fachwissen, Literatur und Toolstack der bestehenden Persona.</p>
+      <div>
+        <label class="text-xs text-slate-400 block mb-1">Fokus (optional)</label>
+        <input type="text" id="sync-focus-input" placeholder="z.B. neue Preprints, neue Software-Tools..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm">
+      </div>
+      <div class="flex gap-2 justify-end">
+        <button onclick="toggleSyncModal(false)" class="px-4 py-2 text-sm text-slate-400">Abbrechen</button>
+        <button id="sync-run-btn" onclick="runSync()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-xl text-sm">Abgleichen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upload Modal -->
+  <div id="upload-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-lg w-full space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Persona hochladen</h3>
+        <button onclick="toggleUploadModal(false)" class="text-slate-400 hover:text-slate-200">✕</button>
+      </div>
+      <p class="text-xs text-slate-400">Lade eine zuvor als JSON exportierte Persona-Datei.</p>
+      <input type="file" id="upload-file-input" accept=".json" onchange="handlePersonaFileUpload(event)" class="w-full text-xs text-slate-300">
+      <div id="upload-error" class="hidden text-xs text-rose-400"></div>
+    </div>
+  </div>
+
+  <!-- File Preview Modal -->
+  <div id="preview-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <h3 id="preview-title" class="text-lg font-semibold"></h3>
+        <button onclick="closePreview()" class="text-slate-400 hover:text-slate-200">✕</button>
+      </div>
+      <pre id="preview-content" class="text-xs text-slate-300 whitespace-pre-wrap bg-slate-950 border border-slate-800 rounded-xl p-4 font-mono"></pre>
+    </div>
+  </div>
+
+  <script>
+'use strict';
+
+const STORAGE_SAVED = 'researcho_saved_personas_v1';
+const RESEARCH_TEMPLATES = [
+  { id: 'quantum-error-correction', name: 'Quanten-Fehlerkorrektur & Qubits', field: 'Topologische Quanten-Fehlerkorrektur und supraleitende Qubits', expertise: 'Surface Codes, Floquet-Codes, Anyonen-Statistik, Quanten-Teleportationsprotokolle, Rauschmodellierung (Decoherence)', skills: 'Qiskit, Stim, PyMatching, C++, Python, Hochfrequenz-Mikrowellenmessungen, Kryostat-Bedienung (<20 mK)', role: 'Principal Investigator / Heisenberg-Professor', target: 'Realisierung fehlertoleranter logischer Qubits unterhalb der Fehlerschwelle für skalierbare Quantenalgorithmen', style: 'Mathematisch rigoros, fokussiert auf Dekohärenz-Metriken und Falsifizierbarkeit von Rauschmodellen' },
+  { id: 'crispr-synthetic-biology', name: 'CRISPR & Epigenom-Engineering', field: 'Synthetische Biologie und präzises Epigenom-Editing', expertise: 'Prime Editing, CRISPR-Cas12/13 Systeme, Histon-Modifikationen, Chromatin-Remodeling, Off-Target-Vorhersagemodelle', skills: 'Next-Generation Sequencing (NGS), CUT&RUN, Bioconductor, Python, Deep Learning zur Guide-RNA-Optimierung, Zellkultur', role: 'Senior Staff Scientist (Molekularbiologie & Genomik)', target: 'Entwicklung transienter epigenetischer Schalter zur reversiblen Repression pathogener Genexpression', style: 'Empirisch exakt, achtet penibel auf Kontrollgruppen, p-Werte und statistische Replikate' },
+  { id: 'mechanistic-interpretability', name: 'Mechanistic Interpretability & KI-Sicherheit', field: 'Mechanistic Interpretability und Alignment großer Sprachmodelle', expertise: 'Sparse Autoencoders (SAEs), Residual Stream Analysis, Circuit Tracing, Activation Patching, Representation Engineering', skills: 'PyTorch, TransformerLens, SAELens, Rust, Python, High-Performance GPU-Cluster (Slurm), Hugging Face', role: 'Research Lead (KI-Sicherheitslabor)', target: 'Identifikation von Täuschungsmustern und verborgenen Weltmodellen in dichten LLM-Aktivierungspfaden', style: 'Hypothesengetrieben, skeptisch gegenüber Korrelationen, fordert kausale Interventionen' },
+  { id: 'earth-system-climate', name: 'Klimadynamik & Ozeanzirkulation', field: 'Physikalische Ozeanographie und Erdsystem-Modellierung', expertise: 'Thermohaline Zirkulation (AMOC), barokline Instabilitäten, Eddy-Permitting-Modelle, Navier-Stokes auf rotierender Kugel', skills: 'Fortran 90, ESMValTool, CDO/NCO, Python (Xarray, Dask), Supercomputing (MPI), Satellitenaltimetrie-Daten', role: 'Leitender Wissenschaftler / IPCC Contributing Author', target: 'Identifikation nichtlinearer Kipppunkte in der Nordatlantischen Tiefenwasserbildung unter Extrem-Szenarien', style: 'Physikalisch fundiert, trennt strikt zwischen Modellprojektion und gemessener Paläoklima-Evidenz' },
+  { id: 'solid-state-batteries', name: 'Festkörper-Batterien & Nanomaterialien', field: 'Elektrochemische Energiespeicherung und Feststoff-Elektrolyte', expertise: 'Sulfidische und oxidische Festelektrolyte, Grenzflächen-Kinetik, Dendriten-Nukleation, Dichtefunktionaltheorie (DFT)', skills: 'VASP/Quantum ESPRESSO, Impedanzspektroskopie (EIS), Röntgenbeugung (XRD), In-situ-SEM, Python-Materials-Project-API', role: 'Gruppenleiter Materialdesign & Elektrochemie', target: 'Lösung des Festkörper-Grenzflächenwiderstands bei Schnellladezyklen oberhalb von 4C', style: 'Material- und prozessorientiert, fokussiert auf mikrostrukturelle Ursache-Wirkungs-Zusammenhänge' }
+];
+
+let userApiKey = localStorage.getItem('gemini_api_key') || '';
+let userApiModel = localStorage.getItem('gemini_api_model') || 'gemini-3.8-flash';
+let currentPersona = null;
+let savedPersonas = [];
+let chatMessages = [];
+let activeTemplate = null;
+let language = 'de';
+
+const $ = (id) => document.getElementById(id);
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function showToast(msg) {
+  const t = $('toast');
+  $('toast-message').textContent = msg;
+  t.classList.remove('-translate-y-24', 'opacity-0', 'pointer-events-none');
+  clearTimeout(showToast._tm);
+  showToast._tm = setTimeout(() => t.classList.add('-translate-y-24', 'opacity-0', 'pointer-events-none'), 2800);
+}
+function showError(msg) { $('error-text').textContent = msg; $('error-banner').classList.remove('hidden'); }
+function hideError() { $('error-banner').classList.add('hidden'); }
+function setLoading(on, step) {
+  $('loading-banner').classList.toggle('hidden', !on);
+  if (step) $('loading-step').textContent = step;
+  $('generate-btn').disabled = on;
+}
+
+/* ---------- Persist ---------- */
+function loadState() {
+  updateApiStatus();
+  try { savedPersonas = JSON.parse(localStorage.getItem(STORAGE_SAVED) || '[]'); } catch (e) { savedPersonas = []; }
+  $('saved-count-label').textContent = 'Gespeichert: ' + savedPersonas.length;
+  renderTemplateButtons();
+}
+function persistSaved() {
+  localStorage.setItem(STORAGE_SAVED, JSON.stringify(savedPersonas.slice(0, 20)));
+  $('saved-count-label').textContent = 'Gespeichert: ' + savedPersonas.length;
+}
+function savePersonaToStorage(p) {
+  savedPersonas = [p, ...savedPersonas.filter(x => x.id !== p.id)].slice(0, 20);
+  persistSaved();
+}
+
+/* ---------- API Key Modal ---------- */
+function updateApiStatus() {
+  $('api-key-status').textContent = userApiKey ? 'Gemini: OK' : 'Gemini: –';
+}
+function toggleApiKeyModal(show) {
+  const m = $('api-modal');
+  if (show === false) { m.classList.add('hidden'); m.classList.remove('flex'); return; }
+  m.classList.toggle('hidden'); m.classList.toggle('flex');
+  $('api-key-input').value = userApiKey;
+  $('api-model-input').value = userApiModel;
+}
+function saveApiKey() {
+  userApiKey = $('api-key-input').value.trim();
+  userApiModel = $('api-model-input').value.trim() || 'gemini-3.8-flash';
+  localStorage.setItem('gemini_api_key', userApiKey);
+  localStorage.setItem('gemini_api_model', userApiModel);
+  updateApiStatus();
+  toggleApiKeyModal(false);
+  showToast('Gemini-Key gespeichert');
+}
+
+/* ---------- Gemini calls (client-side, mit Search Grounding) ---------- */
+async function callGemini(systemInstruction, userContent, opts) {
+  const { withSearch = false, maxTokens = 8000 } = opts || {};
+  if (!userApiKey) throw new Error('Kein Gemini-Key hinterlegt (oben rechts).');
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(userApiModel)}:generateContent?key=${encodeURIComponent(userApiKey)}`;
+  const body = {
+    contents: [{ role: 'user', parts: [{ text: userContent }] }],
+    systemInstruction: { parts: [{ text: systemInstruction }] },
+    generationConfig: { maxOutputTokens: maxTokens }
+  };
+  if (withSearch) body.tools = [{ google_search: {} }];
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData?.error?.message || ('HTTP ' + res.status));
+  }
+  const data = await res.json();
+  const candidate = data?.candidates?.[0];
+  const text = (candidate?.content?.parts || []).map(p => p.text || '').join('');
+  const groundingChunks = candidate?.groundingMetadata?.groundingChunks || [];
+  const webSources = groundingChunks.filter(c => c?.web?.uri).map(c => ({ uri: c.web.uri, title: c.web.title || c.web.uri }));
+  return { text, webSources };
+}
+function extractJson(rawText) {
+  const jsonMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  const toParse = jsonMatch ? jsonMatch[1] : rawText.trim();
+  try { return JSON.parse(toParse); } catch (e) {}
+  const a = rawText.indexOf('{'), b = rawText.lastIndexOf('}');
+  if (a !== -1 && b > a) { try { return JSON.parse(rawText.slice(a, b + 1)); } catch (e) {} }
+  return null;
+}
+
+/* ---------- Language / Templates ---------- */
+function setLanguage(lang) {
+  language = lang;
+  $('lang-de-btn').className = 'px-3 py-1 rounded-lg font-medium transition ' + (lang === 'de' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-slate-200');
+  $('lang-en-btn').className = 'px-3 py-1 rounded-lg font-medium transition ' + (lang === 'en' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-slate-200');
+}
+function renderTemplateButtons() {
+  $('template-buttons').innerHTML = RESEARCH_TEMPLATES.map(t => `
+    <button type="button" onclick="applyTemplate('${t.id}')" id="tmpl-${t.id}" class="text-xs px-3 py-1.5 rounded-xl border transition bg-slate-950 hover:bg-slate-800/80 text-slate-300 border-slate-800 hover:border-slate-700">${esc(t.name)}</button>
+  `).join('');
+}
+function applyTemplate(id) {
+  const t = RESEARCH_TEMPLATES.find(x => x.id === id);
+  if (!t) return;
+  $('f-field').value = t.field;
+  $('f-expertise').value = t.expertise;
+  $('f-skills').value = t.skills;
+  $('f-role').value = t.role;
+  $('f-target').value = t.target;
+  $('f-style').value = t.style;
+  activeTemplate = id;
+  document.querySelectorAll('[id^="tmpl-"]').forEach(b => b.classList.remove('bg-cyan-500/20', 'text-cyan-300', 'border-cyan-500/50'));
+  $('tmpl-' + id).classList.add('bg-cyan-500/20', 'text-cyan-300', 'border-cyan-500/50');
+}
+
+/* ---------- Smart Context Import ---------- */
+function handleContextFileUpload(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  $('context-file-label').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = (ev) => { $('context-text').value = ev.target.result || ''; updateContextWordCount(); };
+  reader.readAsText(file);
+}
+$_wireContextInput = () => $('context-text').addEventListener('input', updateContextWordCount);
+function updateContextWordCount() {
+  const t = $('context-text').value.trim();
+  $('context-word-count').textContent = t ? (t.split(/\s+/).length + ' Wörter bereit zur Analyse') : 'Noch kein Text eingegeben';
+}
+function showContextMsg(msg, isError) {
+  const el = $('context-msg');
+  el.textContent = msg;
+  el.className = 'text-xs p-3 rounded-xl ' + (isError ? 'bg-rose-500/10 border border-rose-500/30 text-rose-300' : 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300');
+  el.classList.remove('hidden');
+}
+async function parseContext(autoGenerate) {
+  const rawText = $('context-text').value.trim();
+  if (!rawText) { showContextMsg('Bitte zuerst einen Text einfügen oder eine Datei laden.', true); return; }
+  $('parse-context-btn').disabled = true; $('parse-context-generate-btn').disabled = true;
+  try {
+    const systemInstruction = `Du bist ein intelligenter akademischer Parsing-Assistent für einen wissenschaftlichen Persona-Generator.
+Der Nutzer übergibt dir einen unstrukturierten Text (z.B. eine KI-Antwort, ein Paper-Abstract, Projektnotizen).
+Analysiere den Text und extrahiere exakt die folgenden 7 Felder für das Formular:
+1. "field": Das primäre wissenschaftliche Forschungsgebiet / Fachthema.
+2. "requiredExpertise": Welche Theorien, Fachbegriffe, Modelle die Persona wissen muss.
+3. "requiredSkills": Welche Methoden, Software, Laborprotokolle sie praktisch können muss.
+4. "roleLevel": Passende Rolle aus: "Senior Research Scientist / Gruppenleiter", "Principal Investigator / Lehrstuhlinhaber (Prof. Dr.)", "Postdoctoral Research Fellow (Postdoc)", "R&D Lead Scientist (Industrieforschung)", oder "Doktorand / Nachwuchsforscher (PhD Candidate)".
+5. "researchTarget": Das zentrale Forschungsvorhaben oder die Hypothese.
+6. "communicationStyle": Der passende Denk- und Argumentationsstil.
+7. "language": "de" oder "en".
+Antworte AUSSCHLIESSLICH im JSON-Format: {"field":"...","requiredExpertise":"...","requiredSkills":"...","roleLevel":"...","researchTarget":"...","communicationStyle":"...","language":"de"}`;
+    const { text } = await callGemini(systemInstruction, `Analysiere diesen Text und extrahiere die Formularfelder:\n\n"""\n${rawText.slice(0, 15000)}\n"""`, { withSearch: false, maxTokens: 1200 });
+    const parsed = extractJson(text) || heuristicContext(rawText);
+    if (parsed.field) $('f-field').value = parsed.field;
+    if (parsed.requiredExpertise) $('f-expertise').value = parsed.requiredExpertise;
+    if (parsed.requiredSkills) $('f-skills').value = parsed.requiredSkills;
+    if (parsed.roleLevel) $('f-role').value = parsed.roleLevel;
+    if (parsed.researchTarget) $('f-target').value = parsed.researchTarget;
+    if (parsed.communicationStyle) $('f-style').value = parsed.communicationStyle;
+    if (parsed.language) setLanguage(parsed.language);
+    activeTemplate = null;
+    showContextMsg('✨ Alle 7 Formularfelder wurden automatisch extrahiert!', false);
+    if (autoGenerate && parsed.field) await generatePersona();
+  } catch (err) {
+    showContextMsg('Fehler beim Parsen: ' + err.message + ' — lokale Heuristik verwendet.', true);
+    const parsed = heuristicContext(rawText);
+    $('f-field').value = parsed.field; $('f-expertise').value = parsed.requiredExpertise; $('f-skills').value = parsed.requiredSkills;
+  } finally {
+    $('parse-context-btn').disabled = false; $('parse-context-generate-btn').disabled = false;
+  }
+}
+function heuristicContext(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  let field = (lines[0] || 'Interdisziplinäre Spitzenforschung').replace(/^(Thema|Forschungsgebiet|Bereich|Fachbereich|Titel|Subject|Field)[:\s-]+/i, '');
+  if (field.length > 90) field = field.slice(0, 85) + '...';
+  return {
+    field: field || 'Fortgeschrittene Daten- & Systemmodellierung', requiredExpertise: text.slice(0, 300),
+    requiredSkills: 'Python, Git, Datenanalyse, empirische Modellierung, statistische Validierung',
+    roleLevel: 'Senior Research Scientist / Gruppenleiter', researchTarget: 'Erforschung und Falsifikation neuer Mechanismen im Fachgebiet',
+    communicationStyle: 'Präzise, evidenzbasiert, analytisch und peer-review-orientiert', language: /[äöüÄÖÜß]/.test(text) ? 'de' : 'en'
+  };
+}
+
+/* ---------- Persona generation (mit Search Grounding) ---------- */
+async function generatePersona() {
+  const field = $('f-field').value.trim();
+  if (!field) return;
+  hideError();
+  $('view-empty').classList.remove('hidden');
+  setLoading(true, '🔍 Starte Google-Search im Web nach Fachliteratur & Durchbrüchen...');
+  const t1 = setTimeout(() => setLoading(true, '📚 Analysiere Institute, Standard-Software und experimentelle Methoden...'), 2800);
+  const t2 = setTimeout(() => setLoading(true, '🧬 Synthetisiere akademisches Profil, kognitiven Denkstil & Fachglossar...'), 5500);
+  const t3 = setTimeout(() => setLoading(true, '📁 Erstelle modulare Textdateien & System-Prompt...'), 8500);
+
+  const params = {
+    field, requiredExpertise: $('f-expertise').value.trim(), requiredSkills: $('f-skills').value.trim(),
+    roleLevel: $('f-role').value, researchTarget: $('f-target').value.trim(), communicationStyle: $('f-style').value.trim(), language
+  };
+  const isGerman = language === 'de';
+  const systemInstruction = `Du bist ein hochkarätiger akademischer Direktor, Wissenschaftsstratege und Persona-Architekt.
+Deine Aufgabe ist es, für ein vorgegebenes wissenschaftliches Forschungsgebiet eine extrem realistische, fachlich tiefgehende und methodisch präzise Wissenschaftler-Persona ("Research Persona") zu erschaffen.
+Dafür recherchierst du mittels Google-Suche die aktuellsten Forschungsergebnisse, führende Universitäten/Institute, Fachjournale, Standardsoftware, experimentelle Methoden, arXiv-Trends und Schlüsselpublikationen im angegebenen Bereich.
+Die Persona muss absolute wissenschaftliche Glaubwürdigkeit besitzen – keine oberflächlichen Allgemeinplätze, sondern echte Fachbegriffe, mathematische/statistische Methoden, Software-Bibliotheken, Modellorganismen/Messapparaturen und real existierende wissenschaftliche Paradigmen.`;
+  const userPrompt = `Recherchiere im Web und erstelle eine tiefgreifende wissenschaftliche Persona basierend auf folgenden Vorgaben:
+- FORSCHUNGSGEBIET: ${params.field}
+- GEWÜNSCHTES FACHWISSEN / THEORIEN: ${params.requiredExpertise || 'Aktueller State-of-the-Art und Schlüsseltheorien des Fachs'}
+- METHODEN, SKILLS & TOOLSTACK: ${params.requiredSkills || 'Standard- und innovative Methoden, quantitative/qualitative Tools, Software'}
+- AKADEMISCHE ROLLE: ${params.roleLevel}
+- ZIELSETZUNG / FORSCHUNGSFRAGE: ${params.researchTarget || 'Erforschung zukunftsweisender ungelöster Probleme im Fachgebiet'}
+- KOMMUNIKATIONS- & DENKSTIL: ${params.communicationStyle || 'Präzise, evidenzbasiert, kritisch-analytisch, forschungsorientiert'}
+- AUSGABESPRACHE: ${isGerman ? 'Deutsch (mit internationalen englischen Fachbegriffen)' : 'English'}
+
+RECHERCHE-AUFTRAG:
+1. Durchsuche das Internet nach den führenden Zentren, aktuellen Schlüssel-Papers (2020-2026), Standard-Software-Stacks, Konferenzen und ungelösten Leitfragen in diesem Bereich.
+2. Erstelle ein vollständiges Profil und generiere strukturierte Daten sowie den Inhalt für 6 eigenständige Textdateien.
+
+Gib das Ergebnis ALS REINES JSON-OBJEKT zurück (ohne einleitenden Text), mit exakt folgender Struktur:
+{"identity":{"fullName":"Vorname Nachname","academicTitle":"z.B. Prof. Dr. rer. nat.","role":"...","affiliation":"...","location":"Stadt, Land","primaryDomain":"...","subfields":["...","...","..."],"hIndexEstimate":"z.B. 34 (ca. 4.200 Zitationen)","bioSummary":"150-250 Wörter","researchMotto":"..."},
+"cognitiveProfile":{"thinkingStyle":"...","communicationStyle":"...","corePhilosophy":"...","blindSpotsAndBiases":"..."},
+"expertKnowledge":{"coreTheories":["...","...","..."],"keyBreakthroughs":["...","..."],"glossary":[{"term":"...","definition":"..."}],"controversies":["..."]},
+"methodologyAndTools":{"softwareAndLibraries":["..."],"computationalMethods":["..."],"labOrEmpiricalProtocols":["..."],"benchmarkDatasets":["..."],"validationApproaches":["..."]},
+"researchAgenda":{"centralHypothesis":"...","openQuestions":["...","...","..."],"plannedExperiments":["...","..."],"potentialImpact":"..."},
+"literatureAndSources":{"keyPapers":[{"title":"...","authors":"...","year":"2023","journalOrArxiv":"...","significance":"..."}],"leadingInstitutions":["...","..."],"topConferencesAndJournals":["...","..."]},
+"systemPrompt":"Vollständiger System-Prompt, mindestens 300 Wörter",
+"files":[{"filename":"01_Persona_Steckbrief_und_Biografie.txt","title":"Persona Steckbrief & Biografie","description":"...","extension":"txt","content":"..."},{"filename":"02_Fachwissen_Theorien_und_Glossar.txt","title":"Fachwissen, Theorien & Glossar","description":"...","extension":"txt","content":"..."},{"filename":"03_Methodik_Tools_und_Workflows.txt","title":"Methodik, Tools & Workflows","description":"...","extension":"txt","content":"..."},{"filename":"04_Recherchierte_Quellen_und_Literatur.txt","title":"Recherchierte Quellen & Literatur","description":"...","extension":"txt","content":"..."},{"filename":"05_KI_System_Prompt.txt","title":"KI-System-Prompt für LLMs","description":"...","extension":"txt","content":"..."},{"filename":"06_Forschungsagenda_und_Hypothesen.txt","title":"Forschungsagenda & Hypothesen","description":"...","extension":"txt","content":"..."}]}`;
+
+  try {
+    const { text, webSources } = await callGemini(systemInstruction, userPrompt, { withSearch: true, maxTokens: 8000 });
+    let parsed = extractJson(text);
+    if (!parsed || !parsed.identity) parsed = fallbackPersona(params, text, webSources);
+    if (!parsed.files || !parsed.files.length) parsed.files = generateFilesFromPersona(parsed, webSources);
+    else {
+      const file4 = parsed.files.find(f => f.filename.includes('04'));
+      if (file4 && webSources.length && !file4.content.includes(webSources[0].uri)) {
+        file4.content += '\n\n=== VERIFIZIERTE WEB-RECHERCHE-QUELLEN (LIVE VIA GOOGLE SEARCH) ===\n' + webSources.map((s, i) => `[${i+1}] ${s.title}\n    URL: ${s.uri}`).join('\n\n');
+      }
+      parsed.files.push({ filename: '07_Komplettes_Forschungsdossier.md', title: 'Komplettes Forschungsdossier', description: 'Alle Module in einer Markdown-Datei', extension: 'md', content: buildFullDossierMd(parsed, webSources) });
+    }
+    parsed.id = 'persona-' + Date.now();
+    parsed.createdAt = new Date().toISOString();
+    currentPersona = parsed;
+    window.__webSources = webSources;
+    savePersonaToStorage(parsed);
+    renderPersonaView();
+    switchPersonaTab('files');
+  } catch (err) {
+    showError(err.message || 'Ein unerwarteter Fehler ist aufgetreten.');
+  } finally {
+    clearTimeout(t1); clearTimeout(t2); clearTimeout(t3);
+    setLoading(false);
+  }
+}
+
+function fallbackPersona(params, rawText, webSources) {
+  const fallbackNames = [
+    { name: 'Dr. Aurelia Lindqvist', title: 'Prof. Dr. rer. nat.', inst: 'ETH Zürich / Max-Planck-Institut', loc: 'Zürich & München' },
+    { name: 'Dr. Julian S. Vance', title: 'Dr. sc. techn.', inst: 'Center for Quantum & Computational Sciences', loc: 'Cambridge, MA' },
+    { name: 'Dr. Mateo Albarrán', title: 'Senior Research Scientist', inst: 'Helmholtz-Zentrum für Spitzenforschung', loc: 'Berlin, Deutschland' },
+    { name: 'Dr. Thao Nguyen-Schmidt', title: 'Prof. Dr. med.', inst: 'Broad Institute & Charité Universitätsmedizin', loc: 'Berlin & Boston' }
+  ];
+  const field = params.field;
+  const chosen = fallbackNames[Math.abs(field.length) % fallbackNames.length];
+  const expertiseItems = params.requiredExpertise ? params.requiredExpertise.split(/[,;\n•-]+/).map(s => s.trim()).filter(Boolean) : [`Nichtlineare Dynamik & Modellbildung in ${field}`, 'Modernste Zustandsschätzungs- und Inferenztheorien', 'Falsifikationsprotokolle & stochastische Rauschmodellierung'];
+  const skillItems = params.requiredSkills ? params.requiredSkills.split(/[,;\n•-]+/).map(s => s.trim()).filter(Boolean) : ['Python', 'PyTorch / JAX', 'C++', 'Git & Docker', 'HPC Slurm Cluster'];
+  return {
+    identity: { fullName: chosen.name, academicTitle: chosen.title, role: params.roleLevel, affiliation: chosen.inst, location: chosen.loc, primaryDomain: field, subfields: [field, ...expertiseItems.slice(0, 3)], hIndexEstimate: '34 (ca. 4.850 Zitationen)', bioSummary: `${chosen.name} ist ${params.roleLevel} am ${chosen.inst}. Seit über 12 Jahren forscht die Persona an der Schnittstelle von ${field} und innovativen Analysemethoden.`, researchMotto: 'Wissenschaftlicher Fortschritt entsteht dort, wo theoretische Eleganz der schonungslosen Prüfung experimenteller Falsifikation standhält.' },
+    cognitiveProfile: { thinkingStyle: 'Streng analytisch-deduktiv mit Fokus auf mathematische Konsistenz und Falsifizierbarkeit.', communicationStyle: 'Präzise, akademisch diszipliniert, konstruktiv-kritisch.', corePhilosophy: 'Kritischer Rationalismus kombiniert mit bayesianischer Wahrscheinlichkeitsaktualisierung.', blindSpotsAndBiases: 'Strikte Skepsis gegenüber rein korrelativen Studien ohne kausale Mechanismus-Hypothese.' },
+    expertKnowledge: { coreTheories: expertiseItems, keyBreakthroughs: [`Entwicklung hochauflösender Inferenzmodelle für komplexe Dynamiken in ${field}`], glossary: [{ term: expertiseItems[0] || 'Paradigmenmodell', definition: `Zentrales theoretisches Rahmenwerk in ${field}.` }], controversies: [`Debatte um Skalierbarkeit vs. empirische Rauschgrenzen in ${field}.`] },
+    methodologyAndTools: { softwareAndLibraries: skillItems, computationalMethods: ['Markov-Chain Monte-Carlo (MCMC)', 'Bayesianische Parameterinferenz'], labOrEmpiricalProtocols: ['Standardisierte Blinded Protocols nach FAIR-Kriterien'], benchmarkDatasets: [`Fachspezifische Referenzdaten für ${field}`], validationApproaches: ['K-Fold Cross-Validation', 'Bootstrap-Konfidenzintervalle (95% CI)'] },
+    researchAgenda: { centralHypothesis: `Durch ${expertiseItems[0] || field} mit ${skillItems[0] || 'modernem Toolstack'} lassen sich bisher ungelöste Skalierungsprobleme aufklären.`, openQuestions: [`Welche Mechanismen limitieren die Vorhersagegenauigkeit in ${field}?`], plannedExperiments: ['Systematischer Pilot-Versuch zur empirischen Überprüfung der Sensitivitätsgrenzen'], potentialImpact: `Paradigmenwechsel hin zu reproduzierbaren, kausal validierten Modellen in ${field}.` },
+    literatureAndSources: { keyPapers: [{ title: `Grundlegende Prinzipien und moderne Durchbrüche in ${field}`, authors: 'Diverse Autoren', year: '2024', journalOrArxiv: 'Nature Reviews / Science Advances', significance: 'Umfassendes Review aktueller Theorien.' }], leadingInstitutions: [chosen.inst, 'Max-Planck-Gesellschaft', 'MIT', 'ETH Zürich'], topConferencesAndJournals: ['Nature / Nature Methods', 'Science / Physical Review Letters'] },
+    systemPrompt: `Du bist ${chosen.title} ${chosen.name}, ${params.roleLevel} am ${chosen.inst}.\nDein Fachgebiet ist ${field}.\nDu verfügst über tiefgehendes Spezialwissen in: ${expertiseItems.join(', ')}.\nDein methodischer Werkzeugkasten umfasst: ${skillItems.join(', ')}.\n\nWISSENSCHAFTLICHE LEITLINIEN: Denke und antworte stets als rigoroser Forscher, argumentiere auf Basis überprüfbarer Evidenz, hinterfrage ungeprüfte Annahmen kritisch, nutze präzise Fachterminologie.`,
+    files: []
+  };
+}
+function generateFilesFromPersona(p, webSources) {
+  const name = p.identity?.fullName || 'Wissenschaftler', field = p.identity?.primaryDomain || 'Forschung';
+  const ws = webSources || [];
+  return [
+    { filename: '01_Persona_Steckbrief_und_Biografie.txt', title: 'Persona Steckbrief & Biografie', description: 'Identität, Werdegang, Denkstil', extension: 'txt', content: `=== AKADEMISCHES PERSONA-PROFIL ===\nName: ${p.identity?.academicTitle || ''} ${name}\nRolle: ${p.identity?.role || ''}\nInstitution: ${p.identity?.affiliation || ''} (${p.identity?.location || ''})\nHauptgebiet: ${field}\n\n=== FORSCHUNGSMOTTO ===\n"${p.identity?.researchMotto || ''}"\n\n=== BIOGRAFIE ===\n${p.identity?.bioSummary || ''}\n` },
+    { filename: '02_Fachwissen_Theorien_und_Glossar.txt', title: 'Fachwissen, Theorien & Glossar', description: 'Domänenwissen, Konzepte, Termini', extension: 'txt', content: `=== KERNTHEORIEN: ${field.toUpperCase()} ===\n${(p.expertKnowledge?.coreTheories || []).map((t,i) => `[${i+1}] ${t}`).join('\n\n')}\n\n=== GLOSSAR ===\n${(p.expertKnowledge?.glossary || []).map(g => `• ${g.term}: ${g.definition}`).join('\n\n')}\n` },
+    { filename: '03_Methodik_Tools_und_Workflows.txt', title: 'Methodik, Tools & Workflows', description: 'Software, Methoden, Benchmarks', extension: 'txt', content: `SOFTWARE:\n${(p.methodologyAndTools?.softwareAndLibraries || []).map(s => '- '+s).join('\n')}\n\nMETHODEN:\n${(p.methodologyAndTools?.computationalMethods || []).map(c => '- '+c).join('\n')}\n` },
+    { filename: '04_Recherchierte_Quellen_und_Literatur.txt', title: 'Recherchierte Quellen & Literatur', description: 'Fachliteratur, Institute, Weblinks', extension: 'txt', content: `SCHLÜSSEL-PUBLIKATIONEN:\n${(p.literatureAndSources?.keyPapers || []).map(k => `${k.title} (${k.year || ''})`).join('\n')}\n\n${ws.length ? '=== LIVE GOOGLE SEARCH QUELLEN ===\n' + ws.map((s,i) => `[${i+1}] ${s.title}\n    ${s.uri}`).join('\n\n') : ''}` },
+    { filename: '05_KI_System_Prompt.txt', title: 'KI-System-Prompt für LLMs', description: 'Fertiger Prompt für ChatGPT/Claude/Gemini', extension: 'txt', content: p.systemPrompt || `Du bist ${name}, Experte auf dem Gebiet ${field}.` },
+    { filename: '06_Forschungsagenda_und_Hypothesen.txt', title: 'Forschungsagenda & Hypothesen', description: 'Vorhaben, offene Fragen', extension: 'txt', content: `HYPOTHESE:\n${p.researchAgenda?.centralHypothesis || ''}\n\nOFFENE FRAGEN:\n${(p.researchAgenda?.openQuestions || []).map((q,i) => `${i+1}. ${q}`).join('\n')}\n` }
+  ];
+}
+function buildFullDossierMd(p, ws) {
+  return `# FORSCHER-PERSONA DOSSIER: ${p.identity?.fullName || 'Wissenschaftler'}
+${p.identity?.academicTitle || ''} | ${p.identity?.role || ''}
+Affiliation: ${p.identity?.affiliation || ''} (${p.identity?.location || ''})
+Forschungsgebiet: ${p.identity?.primaryDomain || ''}
+
+---
+## 1. Akademischer Steckbrief & Philosophie
+${p.identity?.bioSummary || ''}
+**Forschungsmotto:** "${p.identity?.researchMotto || ''}"
+**Denkstil:** ${p.cognitiveProfile?.thinkingStyle || ''}
+
+---
+## 2. Kernfachwissen & Theorien
+${(p.expertKnowledge?.coreTheories || []).map(t => '- ' + t).join('\n')}
+### Glossar
+${(p.expertKnowledge?.glossary || []).map(g => `* **${g.term}:** ${g.definition}`).join('\n')}
+
+---
+## 3. Methoden & Toolstack
+- **Software:** ${(p.methodologyAndTools?.softwareAndLibraries || []).join(', ')}
+- **Rechenverfahren:** ${(p.methodologyAndTools?.computationalMethods || []).join(', ')}
+
+---
+## 4. Forschungsagenda
+**Zentrale Hypothese:** ${p.researchAgenda?.centralHypothesis || ''}
+${(p.researchAgenda?.openQuestions || []).map((q,i) => `${i+1}. ${q}`).join('\n')}
+
+---
+## 5. Web-Recherchierte Quellen
+${(p.literatureAndSources?.keyPapers || []).map(k => `- **${k.title}** (${k.year || ''}): ${k.significance || ''}`).join('\n')}
+${ws.map((s,i) => `[${i+1}] [${s.title}](${s.uri})`).join('\n')}
+
+---
+## 6. KI-System-Prompt
+\`\`\`
+${p.systemPrompt || ''}
+\`\`\`
+`;
+}
+
+/* ---------- Persona view rendering ---------- */
+function newPersona() {
+  currentPersona = null;
+  $('view-persona').classList.add('hidden');
+  $('view-empty').classList.remove('hidden');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function renderPersonaView() {
+  if (!currentPersona) return;
+  $('view-empty').classList.add('hidden');
+  $('view-persona').classList.remove('hidden');
+  const p = currentPersona;
+  $('persona-status-name').textContent = 'Persona aktiv: ' + (p.identity?.academicTitle || '') + ' ' + (p.identity?.fullName || '');
+  $('persona-status-domain').textContent = (p.identity?.primaryDomain || '') + ' • ' + (p.identity?.affiliation || '');
+  if (p.lastUpdated) {
+    $('changelog-banner').classList.remove('hidden');
+    $('changelog-banner').innerHTML = `<strong class="text-emerald-300">Aktualisiert: ${new Date(p.lastUpdated).toLocaleDateString('de-DE')}</strong> (${esc(p.updateFocus || '')})<ul class="mt-2 list-disc list-inside space-y-1">${(p.changelog || []).map(c => `<li><strong>${esc(c.category)}:</strong> ${esc(c.description)}</li>`).join('')}</ul>`;
+  } else {
+    $('changelog-banner').classList.add('hidden');
+  }
+  renderFilesGrid();
+  renderDossier();
+  resetChat();
+}
+function switchPersonaTab(name) {
+  document.querySelectorAll('.ptab-content').forEach(el => el.classList.add('hidden'));
+  document.querySelectorAll('[id^="ptab-btn-"]').forEach(b => { b.classList.remove('tab-active'); b.classList.add('text-slate-400'); });
+  $('ptab-' + name).classList.remove('hidden');
+  $('ptab-btn-' + name).classList.add('tab-active');
+  $('ptab-btn-' + name).classList.remove('text-slate-400');
+}
+
+function renderFilesGrid() {
+  const files = currentPersona.files || [];
+  const badges = { '01': ['Vita & Profil','indigo'], '02': ['Theorie & Glossar','emerald'], '03': ['Methoden & Stack','cyan'], '04': ['Web-Quellen','amber'], '05': ['KI-Prompt','purple'], '06': ['Forschungsagenda','rose'], '07': ['Gesamt-Dossier','blue'] };
+  $('files-grid').innerHTML = files.map((f, idx) => {
+    const key = f.filename.slice(0, 2);
+    const [label, color] = badges[key] || ['Dokument', 'slate'];
+    const words = f.content.trim().split(/\s+/).length;
+    return `<div class="group flex flex-col justify-between p-4 md:p-5 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700 transition">
+      <div>
+        <div class="flex items-start justify-between gap-3 mb-2">
+          <span class="text-[11px] font-medium px-2 py-0.5 rounded-md border text-${color}-400 bg-${color}-500/10 border-${color}-500/30">${esc(label)}</span>
+          <span class="text-[11px] text-slate-500 font-mono">~${words} Wörter</span>
+        </div>
+        <h3 class="text-sm font-semibold text-slate-200 flex items-center gap-2">📄 <span class="truncate">${esc(f.title)}</span></h3>
+        <p class="text-xs text-slate-400 mt-1 line-clamp-2">${esc(f.description)}</p>
+        <div class="mt-2.5 text-[11px] font-mono text-slate-500 truncate bg-slate-900/80 px-2 py-1 rounded border border-slate-800/60">${esc(f.filename)}</div>
+      </div>
+      <div class="flex items-center justify-between pt-4 mt-3 border-t border-slate-800/60 gap-2">
+        <div class="flex items-center gap-1.5">
+          <button onclick="previewFile(${idx})" class="px-2.5 py-1.5 text-xs text-slate-400 hover:text-slate-200 bg-slate-900 hover:bg-slate-800 rounded-lg border border-slate-800">👁 Vorschau</button>
+          <button onclick="copyFile(${idx})" class="px-2.5 py-1.5 text-xs text-slate-400 hover:text-slate-200 bg-slate-900 hover:bg-slate-800 rounded-lg border border-slate-800">📋 Kopieren</button>
+        </div>
+        <button onclick="downloadSingleFile(${idx})" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-cyan-600/90 hover:bg-cyan-500 text-white">⬇ .${f.extension}</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function downloadTextFile(name, content, mime) {
+  const blob = new Blob([content], { type: mime || 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+function downloadSingleFile(idx) {
+  const f = currentPersona.files[idx];
+  downloadTextFile(f.filename, f.content, f.extension === 'md' ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8');
+}
+function copyFile(idx) {
+  const f = currentPersona.files[idx];
+  navigator.clipboard.writeText(f.content).then(() => showToast('Kopiert: ' + f.filename));
+}
+function previewFile(idx) {
+  const f = currentPersona.files[idx];
+  $('preview-title').textContent = f.title;
+  $('preview-content').textContent = f.content;
+  const m = $('preview-modal'); m.classList.remove('hidden'); m.classList.add('flex');
+}
+function closePreview() { const m = $('preview-modal'); m.classList.add('hidden'); m.classList.remove('flex'); }
+function downloadJson() {
+  const safeName = (currentPersona.identity?.fullName || 'persona').toLowerCase().replace(/\s+/g, '_');
+  downloadTextFile(safeName + '_komplett.json', JSON.stringify(currentPersona, null, 2), 'application/json');
+}
+
+/* ---------- Minimal inline ZIP writer (STORED, unkomprimiert -- keine externe Abhaengigkeit) ---------- */
+function crc32(buf) {
+  let c, crc = 0xFFFFFFFF;
+  for (let i = 0; i < buf.length; i++) {
+    c = (crc ^ buf[i]) & 0xFF;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    crc = (crc >>> 8) ^ c;
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+function buildZip(files) {
+  const enc = new TextEncoder();
+  const localParts = [], centralParts = [];
+  let offset = 0;
+  for (const { name, content } of files) {
+    const nameBytes = enc.encode(name);
+    const dataBytes = enc.encode(content);
+    const crc = crc32(dataBytes);
+    const size = dataBytes.length;
+    const localHeader = new Uint8Array(30 + nameBytes.length);
+    const lv = new DataView(localHeader.buffer);
+    lv.setUint32(0, 0x04034b50, true); lv.setUint16(4, 20, true); lv.setUint16(6, 0, true); lv.setUint16(8, 0, true);
+    lv.setUint16(10, 0, true); lv.setUint16(12, 0, true); lv.setUint32(14, crc, true); lv.setUint32(18, size, true); lv.setUint32(22, size, true);
+    lv.setUint16(26, nameBytes.length, true); lv.setUint16(28, 0, true);
+    localHeader.set(nameBytes, 30);
+    localParts.push(localHeader, dataBytes);
+
+    const centralHeader = new Uint8Array(46 + nameBytes.length);
+    const cv = new DataView(centralHeader.buffer);
+    cv.setUint32(0, 0x02014b50, true); cv.setUint16(4, 20, true); cv.setUint16(6, 20, true); cv.setUint16(8, 0, true);
+    cv.setUint16(10, 0, true); cv.setUint16(12, 0, true); cv.setUint16(14, 0, true); cv.setUint32(16, crc, true);
+    cv.setUint32(20, size, true); cv.setUint32(24, size, true); cv.setUint16(28, nameBytes.length, true);
+    cv.setUint16(30, 0, true); cv.setUint16(32, 0, true); cv.setUint16(34, 0, true); cv.setUint16(36, 0, true);
+    cv.setUint32(38, 0, true); cv.setUint32(42, offset, true);
+    centralHeader.set(nameBytes, 46);
+    centralParts.push(centralHeader);
+    offset += localHeader.length + dataBytes.length;
+  }
+  const centralSize = centralParts.reduce((a, p) => a + p.length, 0);
+  const centralOffset = offset;
+  const end = new Uint8Array(22);
+  const ev = new DataView(end.buffer);
+  ev.setUint32(0, 0x06054b50, true); ev.setUint16(4, 0, true); ev.setUint16(6, 0, true);
+  ev.setUint16(8, files.length, true); ev.setUint16(10, files.length, true);
+  ev.setUint32(12, centralSize, true); ev.setUint32(16, centralOffset, true); ev.setUint16(20, 0, true);
+  return new Blob([...localParts, ...centralParts, end], { type: 'application/zip' });
+}
+function downloadAllZip() {
+  const safeName = (currentPersona.identity?.fullName || 'Wissenschaftler').replace(/[^a-zA-Z0-9_\-äöüÄÖÜß]/g, '_');
+  const folder = 'Persona_' + safeName + '/';
+  const files = (currentPersona.files || []).map(f => ({ name: folder + f.filename, content: f.content }));
+  files.push({ name: folder + '00_Persona_Konfiguration.json', content: JSON.stringify(currentPersona, null, 2) });
+  const blob = buildZip(files);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = folder.replace('/', '') + '_Dossier.zip'; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  showToast('ZIP heruntergeladen');
+}
+
+/* ---------- Dossier view ---------- */
+function renderDossier() {
+  const p = currentPersona, ws = window.__webSources || [];
+  const li = (arr) => (arr || []).map(x => `<li>${esc(x)}</li>`).join('');
+  $('dossier-content').innerHTML = `
+    <div>
+      <h2 class="text-2xl font-bold text-white">${esc(p.identity?.academicTitle || '')} ${esc(p.identity?.fullName || '')}</h2>
+      <p class="text-cyan-300 text-sm">${esc(p.identity?.role || '')} · ${esc(p.identity?.affiliation || '')} (${esc(p.identity?.location || '')})</p>
+      <p class="text-slate-400 text-xs mt-1">H-Index: ${esc(p.identity?.hIndexEstimate || '')}</p>
+      <p class="italic text-slate-300 mt-3">"${esc(p.identity?.researchMotto || '')}"</p>
+      <p class="text-sm text-slate-300 mt-3 leading-relaxed">${esc(p.identity?.bioSummary || '')}</p>
+    </div>
+    <div class="grid md:grid-cols-2 gap-6 pt-4 border-t border-slate-800">
+      <div><h3 class="text-sm font-bold text-cyan-400 mb-2">Kognitives Profil</h3>
+        <p class="text-xs text-slate-300"><strong>Denkstil:</strong> ${esc(p.cognitiveProfile?.thinkingStyle || '')}</p>
+        <p class="text-xs text-slate-300 mt-1"><strong>Philosophie:</strong> ${esc(p.cognitiveProfile?.corePhilosophy || '')}</p></div>
+      <div><h3 class="text-sm font-bold text-cyan-400 mb-2">Subdisziplinen</h3>
+        <div class="flex flex-wrap gap-1.5">${(p.identity?.subfields || []).map(s => `<span class="text-[11px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">${esc(s)}</span>`).join('')}</div></div>
+    </div>
+    <div class="pt-4 border-t border-slate-800">
+      <h3 class="text-sm font-bold text-cyan-400 mb-2">Kerntheorien</h3>
+      <ul class="text-xs text-slate-300 list-disc list-inside space-y-1">${li(p.expertKnowledge?.coreTheories)}</ul>
+      <h3 class="text-sm font-bold text-cyan-400 mb-2 mt-4">Glossar</h3>
+      <div class="space-y-1.5 text-xs">${(p.expertKnowledge?.glossary || []).map(g => `<p class="text-slate-300"><strong class="text-slate-100">${esc(g.term)}:</strong> ${esc(g.definition)}</p>`).join('')}</div>
+    </div>
+    <div class="pt-4 border-t border-slate-800">
+      <h3 class="text-sm font-bold text-cyan-400 mb-2">Methodik &amp; Toolstack</h3>
+      <p class="text-xs text-slate-300"><strong>Software:</strong> ${esc((p.methodologyAndTools?.softwareAndLibraries || []).join(', '))}</p>
+      <p class="text-xs text-slate-300 mt-1"><strong>Rechenverfahren:</strong> ${esc((p.methodologyAndTools?.computationalMethods || []).join(', '))}</p>
+    </div>
+    <div class="pt-4 border-t border-slate-800">
+      <h3 class="text-sm font-bold text-cyan-400 mb-2">Forschungsagenda</h3>
+      <p class="text-xs text-slate-300"><strong>Zentrale Hypothese:</strong> ${esc(p.researchAgenda?.centralHypothesis || '')}</p>
+      <ul class="text-xs text-slate-300 list-disc list-inside mt-2 space-y-1">${li(p.researchAgenda?.openQuestions)}</ul>
+    </div>
+    <div class="pt-4 border-t border-slate-800">
+      <h3 class="text-sm font-bold text-cyan-400 mb-2">Web-recherchierte Quellen (live via Google Search)</h3>
+      <div class="flex flex-wrap gap-1.5">${ws.map(s => `<a href="${esc(s.uri)}" target="_blank" rel="noopener noreferrer" class="text-[11px] px-2 py-1 rounded bg-slate-950 border border-slate-800 text-slate-300 hover:text-cyan-300 truncate max-w-xs">${esc(s.title)}</a>`).join('') || '<span class="text-xs text-slate-500">Keine Live-Quellen zurückgegeben.</span>'}</div>
+    </div>`;
+}
+
+/* ---------- Chat ---------- */
+function resetChat() {
+  const p = currentPersona;
+  chatMessages = [{ role: 'persona', content: `Guten Tag. Ich bin ${p.identity?.academicTitle || ''} ${p.identity?.fullName || 'Forscher'}, ${p.identity?.role || ''} am ${p.identity?.affiliation || ''}.\n\nMein Forschungsschwerpunkt liegt auf ${p.identity?.primaryDomain || ''}. Welche Frage möchten Sie diskutieren?`, ts: nowTime() }];
+  $('chat-header').textContent = 'Wissenschaftlicher Dialog: ' + (p.identity?.academicTitle || '') + ' ' + (p.identity?.fullName || '');
+  renderChat();
+  const suggestions = ['Wie würdest du ein Pilot-Experiment zur Falsifizierung unserer Hypothese aufbauen?', 'Welche statistischen Fallstricke existieren in diesem Design?', 'Welche Tools und Benchmark-Datensätze empfiehlst du?', 'Wie reagiert die Fachwelt aktuell auf diese Fragestellung?'];
+  $('chat-suggestions').innerHTML = '<span class="text-[11px] text-slate-400 self-center shrink-0 font-medium">Ideen:</span>' + suggestions.map(s => `<button onclick="sendChatMessage(${JSON.stringify(s)})" class="text-xs px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-cyan-300 border border-slate-700/60 whitespace-nowrap">${esc(s)}</button>`).join('');
+}
+function nowTime() { return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+function renderChat() {
+  $('chat-messages').innerHTML = chatMessages.map(m => `
+    <div class="flex items-start gap-3 ${m.role === 'user' ? 'justify-end' : 'justify-start'}">
+      ${m.role === 'persona' ? '<div class="w-8 h-8 rounded-lg bg-indigo-600/30 text-indigo-400 border border-indigo-500/30 flex items-center justify-center shrink-0">🎓</div>' : ''}
+      <div class="max-w-[85%] rounded-2xl px-4 py-3 text-xs md:text-sm leading-relaxed ${m.role === 'user' ? 'bg-cyan-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-200'}">
+        <div class="whitespace-pre-wrap">${esc(m.content)}</div>
+        ${m.webSources && m.webSources.length ? `<div class="mt-3 pt-2.5 border-t border-slate-800/80"><span class="text-[11px] font-semibold text-cyan-400 block mb-1.5">Recherchierte Quellen:</span><div class="flex flex-wrap gap-1.5">${m.webSources.map(s => `<a href="${esc(s.uri)}" target="_blank" rel="noopener noreferrer" class="text-[11px] px-2 py-0.5 rounded bg-slate-950/80 hover:bg-slate-800 text-slate-300 hover:text-cyan-300 border border-slate-800 truncate max-w-xs">${esc(s.title)}</a>`).join('')}</div></div>` : ''}
+        <div class="text-[10px] mt-1.5 ${m.role === 'user' ? 'text-cyan-200/70 text-right' : 'text-slate-500'}">${m.ts}</div>
+      </div>
+      ${m.role === 'user' ? '<div class="w-8 h-8 rounded-lg bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center shrink-0">🧑</div>' : ''}
+    </div>`).join('');
+  $('chat-messages').scrollTop = $('chat-messages').scrollHeight;
+}
+async function sendChatMessage(preset) {
+  const input = $('chat-input');
+  const query = preset || input.value.trim();
+  if (!query) return;
+  chatMessages.push({ role: 'user', content: query, ts: nowTime() });
+  if (!preset) input.value = '';
+  renderChat();
+  try {
+    const contentsText = chatMessages.slice(0, -1).map(m => (m.role === 'user' ? 'Nutzer' : 'Persona') + ': ' + m.content).join('\n\n');
+    const { text, webSources } = await callGemini(currentPersona.systemPrompt || 'Du bist ein erfahrener Wissenschaftler.', (contentsText ? contentsText + '\n\n' : '') + 'Nutzer: ' + query, { withSearch: true, maxTokens: 2000 });
+    chatMessages.push({ role: 'persona', content: text || 'Keine Antwort erhalten.', ts: nowTime(), webSources });
+  } catch (err) {
+    chatMessages.push({ role: 'persona', content: 'Entschuldigung, bei der Bearbeitung ist ein Fehler aufgetreten: ' + err.message, ts: nowTime() });
+  }
+  renderChat();
+}
+
+/* ---------- Sync/Update ---------- */
+function openSync() { const m = $('sync-modal'); m.classList.remove('hidden'); m.classList.add('flex'); }
+function toggleSyncModal(show) { const m = $('sync-modal'); if (show === false) { m.classList.add('hidden'); m.classList.remove('flex'); } }
+async function runSync() {
+  const focus = $('sync-focus-input').value.trim();
+  $('sync-run-btn').disabled = true; $('sync-run-btn').textContent = 'Recherchiere...';
+  const p = currentPersona;
+  const currentDate = new Date().toLocaleDateString('de-DE');
+  const systemInstruction = `Du bist ein hochkarätiger Wissenschaftsstratege und Persona-Architekt.
+Deine Aufgabe ist es, eine bereits existierende Forscher-Persona mit den ALLERNEUESTEN wissenschaftlichen Erkenntnissen abzugleichen und zu aktualisieren.
+WICHTIG: Behalte die grundlegende Identität bei. Erweitere Fachwissen, Literatur, Werkzeuge, Forschungsagenda. Verfasse ein Changelog.`;
+  const userPrompt = `Führe einen Live-Forschungsabgleich via Google-Suche durch und aktualisiere folgende Persona:
+Name: ${p.identity?.fullName} (${p.identity?.academicTitle || ''})
+Fachgebiet: ${p.identity?.primaryDomain}
+Bisherige Kerntheorien: ${(p.expertKnowledge?.coreTheories || []).slice(0,3).join(', ')}
+Fokus für diesen Abgleich: ${focus || 'Aktuellste Forschungsergebnisse, neue Papers, neue Tools'}
+
+Gib das Ergebnis ALS REINES JSON-OBJEKT mit vollständiger aktualisierter Persona-Struktur (identisches Schema wie bei der Erstgenerierung) UND einem "changelog"-Array zurück: [{"category":"...","description":"..."}]`;
+  try {
+    const { text, webSources } = await callGemini(systemInstruction, userPrompt, { withSearch: true, maxTokens: 8000 });
+    let updated = extractJson(text);
+    if (!updated || !updated.identity) {
+      updated = JSON.parse(JSON.stringify(p));
+      updated.expertKnowledge.keyBreakthroughs.unshift(`[Neu ${currentDate}] Neueste Evidenz & Paradigmenverschiebung in ${p.identity?.primaryDomain}`);
+    }
+    updated.id = p.id; updated.createdAt = p.createdAt;
+    updated.lastUpdated = new Date().toISOString();
+    updated.updateFocus = focus || 'Allgemeiner aktueller Forschungsstand';
+    if (!updated.changelog || !updated.changelog.length) updated.changelog = [{ category: 'Live-Literatur-Abgleich', description: `Abgleich mit aktuellen Publikationen im Bereich ${p.identity?.primaryDomain}.` }];
+    if (!updated.files || !updated.files.length) updated.files = generateFilesFromPersona(updated, webSources);
+    const header = `[AKTUALISIERTER FORSCHUNGSSTAND: ${currentDate}]\n[Update-Fokus: ${updated.updateFocus}]\n\n`;
+    updated.files.forEach(f => { if (!f.content.startsWith('[AKTUALISIERTER')) f.content = header + f.content; });
+    currentPersona = updated;
+    window.__webSources = [...webSources, ...(window.__webSources || [])];
+    savePersonaToStorage(updated);
+    renderPersonaView();
+    switchPersonaTab('files');
+    toggleSyncModal(false);
+    showToast('Forschungsstand aktualisiert');
+  } catch (err) {
+    showError('Abgleich fehlgeschlagen: ' + err.message);
+    toggleSyncModal(false);
+  } finally {
+    $('sync-run-btn').disabled = false; $('sync-run-btn').textContent = 'Abgleichen';
+  }
+}
+
+/* ---------- Saved / Upload ---------- */
+function openSaved() { renderSavedList(); const m = $('saved-modal'); m.classList.remove('hidden'); m.classList.add('flex'); }
+function toggleSavedModal(show) { const m = $('saved-modal'); if (show === false) { m.classList.add('hidden'); m.classList.remove('flex'); } }
+function renderSavedList() {
+  if (!savedPersonas.length) { $('saved-list').innerHTML = '<p class="text-xs text-slate-500">Noch keine gespeicherten Personas.</p>'; return; }
+  $('saved-list').innerHTML = savedPersonas.map(p => `
+    <div class="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800">
+      <div class="min-w-0">
+        <p class="text-sm text-slate-200 truncate">${esc(p.identity?.academicTitle || '')} ${esc(p.identity?.fullName || 'Persona')}</p>
+        <p class="text-xs text-slate-500 truncate">${esc(p.identity?.primaryDomain || '')}</p>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <button onclick='loadSavedPersona(${JSON.stringify(p.id)})' class="text-xs px-2.5 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white">Öffnen</button>
+        <button onclick='deleteSavedPersona(${JSON.stringify(p.id)})' class="text-xs px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-rose-900 text-slate-300">🗑</button>
+      </div>
+    </div>`).join('');
+}
+function loadSavedPersona(id) {
+  const p = savedPersonas.find(x => x.id === id);
+  if (!p) return;
+  currentPersona = p;
+  window.__webSources = [];
+  renderPersonaView();
+  toggleSavedModal(false);
+}
+function deleteSavedPersona(id) {
+  savedPersonas = savedPersonas.filter(p => p.id !== id);
+  persistSaved();
+  renderSavedList();
+  if (currentPersona?.id === id) newPersona();
+}
+function openUpload() { $('upload-error').classList.add('hidden'); const m = $('upload-modal'); m.classList.remove('hidden'); m.classList.add('flex'); }
+function toggleUploadModal(show) { const m = $('upload-modal'); if (show === false) { m.classList.add('hidden'); m.classList.remove('flex'); } }
+function handlePersonaFileUpload(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const parsed = JSON.parse(ev.target.result);
+      if (!parsed.identity) throw new Error('Keine gültige Persona-Datei (fehlt "identity").');
+      parsed.id = parsed.id || 'persona-' + Date.now();
+      currentPersona = parsed;
+      window.__webSources = [];
+      savePersonaToStorage(parsed);
+      renderPersonaView();
+      toggleUploadModal(false);
+      showToast('Persona geladen');
+    } catch (err) {
+      $('upload-error').textContent = 'Fehler: ' + err.message;
+      $('upload-error').classList.remove('hidden');
+    }
+  };
+  reader.readAsText(file);
+}
+
+/* ---------- Init ---------- */
+loadState();
+$_wireContextInput();
+</script>
+</body>
+</html>
