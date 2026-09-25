@@ -57,7 +57,7 @@
         <a href="alex-fehler-labor.html" class="text-xs text-slate-400 hover:text-slate-200 px-2 py-1">→ Fehler-Labor</a>
         <button onclick="toggleApiKeyModal()" class="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-2 transition">
           <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 0121 9z"></path></svg>
-          <span id="api-key-status">DeepSeek: –</span>
+          <span id="api-key-status">KI-Anbieter: –</span>
         </button>
       </div>
     </div>
@@ -66,9 +66,9 @@
   <!-- CORS Notice -->
   <div class="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-4">
     <details class="bg-amber-950/30 border border-amber-900/60 rounded-xl">
-      <summary class="p-3 text-xs text-amber-300 font-medium">⚠️ DeepSeek / Gemini CORS-Hinweis — klick für Proxy-Lösung</summary>
+      <summary class="p-3 text-xs text-amber-300 font-medium">⚠️ CORS-Hinweis (alle KI-Anbieter) — klick für Proxy-Lösung</summary>
       <div class="px-3 pb-3 text-[11px] text-slate-400 leading-relaxed space-y-2">
-        <p>Browser blockieren direkte Anfragen von lokalen Dateien an externe APIs (CORS). Für DeepSeek und Gemini brauchst du entweder einen eigenen kleinen Proxy (z.B. ein lokales Node-Skript, das die Anfrage weiterleitet) oder die Keys bleiben clientseitig (mit CORS-Risiko, nur für den eigenen Gebrauch geeignet).</p>
+        <p>Browser blockieren direkte Anfragen von lokalen Dateien an externe APIs (CORS). Unabhängig vom gewählten Anbieter (DeepSeek, OpenAI, Anthropic, Gemini, eigener Endpunkt) brauchst du entweder einen eigenen kleinen Proxy (z.B. ein lokales Node-Skript, das die Anfrage weiterleitet) oder die Keys bleiben clientseitig (mit CORS-Risiko, nur für den eigenen Gebrauch geeignet).</p>
       </div>
     </details>
   </div>
@@ -294,8 +294,8 @@
             <p class="text-slate-400">Generiere Social-Posts aus Projekt-Kontext, Repo oder Prompt aus dem Studio.</p>
 
             <div>
-              <label class="block font-semibold text-slate-300 uppercase tracking-wider mb-1">DeepSeek Key</label>
-              <input type="password" id="content-deepseek-key" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 font-mono" placeholder="sk-...">
+              <label class="block font-semibold text-slate-300 uppercase tracking-wider mb-1">KI-Key (überschreibt Einstellungen, optional)</label>
+              <input type="password" id="content-deepseek-key" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 font-mono" placeholder="Key">
             </div>
             <div>
               <label class="block font-semibold text-slate-300 uppercase tracking-wider mb-1">Gemini Key (für Bilder, optional)</label>
@@ -532,7 +532,7 @@
       <div class="bg-teal-950/30 border border-teal-900/50 rounded-2xl p-5 text-xs text-slate-300 leading-relaxed space-y-2">
         <h3 class="text-sm font-semibold text-teal-300">📜 Genesis – Entwicklung rekonstruieren</h3>
         <p>Genesis analysiert Code, Notizen, Chat-Exporte und Git-Historie in fünf Schritten (Material → Zeitleiste → Analyse → Interview → Ergebnis). Neu u.a.: <strong>Operationskarten</strong>, <strong>Behauptungs-Ledger</strong>, <strong>Spannungen</strong>. Hier importierst du die Projektdatei oder das Ergebnis-Markdown und übernimmst die Bausteine in den Kontext — für Prompt, Plan und CLAUDE.md.</p>
-        <p class="text-slate-400">API-Key: Genesis liest denselben DeepSeek-Key aus dem Browser (<code class="text-slate-300">localStorage</code>), den du oben rechts speicherst. Beide Dateien sollten im selben Ordner liegen.</p>
+        <p class="text-slate-400">API-Key: Genesis liest denselben KI-Anbieter und Key aus dem Browser (<code class="text-slate-300">localStorage</code>), den du oben rechts speicherst. Beide Dateien sollten im selben Ordner liegen.</p>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -624,16 +624,26 @@
   <div id="api-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between">
-        <h3 class="text-base font-semibold text-slate-100">⚙️ DeepSeek Konfiguration</h3>
+        <h3 class="text-base font-semibold text-slate-100">⚙️ KI-Anbieter-Konfiguration</h3>
         <button onclick="toggleApiKeyModal()" class="text-slate-400 hover:text-slate-200">✕</button>
       </div>
-      <p class="text-xs text-slate-400 leading-relaxed">Deterministische Generatoren funktionieren ohne Key. KI-Funktionen brauchen einen erreichbaren Endpoint.</p>
+      <p class="text-xs text-slate-400 leading-relaxed">Deterministische Generatoren funktionieren ohne Key. KI-Funktionen brauchen einen erreichbaren Endpoint. Gleiche Einstellungen wie Fehler-Labor/Genesis (localStorage, gleicher Browser).</p>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Anbieter</label>
+          <select id="api-provider-input" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200"></select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Modell</label>
+          <input type="text" id="api-model-input" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 font-mono" placeholder="Modellname">
+        </div>
+      </div>
       <div>
         <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">API Endpoint</label>
         <input type="text" id="api-endpoint-input" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 font-mono" placeholder="https://api.deepseek.com/chat/completions">
       </div>
       <div>
-        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">DeepSeek API Key</label>
+        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">API Key</label>
         <input type="password" id="api-key-input" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 font-mono" placeholder="sk-...">
       </div>
       <div class="flex justify-end gap-2 pt-2">
@@ -645,8 +655,43 @@
 
   <script>
     // ========== STATE ==========
-    let userApiKey = localStorage.getItem('deepseek_api_key') || '';
-    let userApiEndpoint = localStorage.getItem('deepseek_api_endpoint') || 'https://api.deepseek.com/chat/completions';
+    const PROVIDERS = {
+      deepseek: { label: 'DeepSeek', url: 'https://api.deepseek.com/chat/completions', model: 'deepseek-chat', style: 'openai' },
+      openai: { label: 'OpenAI', url: 'https://api.openai.com/v1/chat/completions', model: 'gpt-4o-mini', style: 'openai' },
+      anthropic: { label: 'Anthropic', url: 'https://api.anthropic.com/v1/messages', model: 'claude-sonnet-5', style: 'anthropic' },
+      custom: { label: 'Eigener Anbieter (OpenAI-kompatibel)', url: '', model: '', style: 'openai' }
+    };
+    // Geteilte Einstellungen mit Fehler-Labor/Genesis (gleicher Browser). Alte deepseek_*-Keys
+    // (vor Multi-Provider) werden als Fallback gelesen, falls llm_* noch nicht existiert.
+    let userApiProvider = localStorage.getItem('llm_provider') || 'deepseek';
+    let userApiKey = localStorage.getItem('llm_key') || localStorage.getItem('deepseek_api_key') || '';
+    let userApiEndpoint = localStorage.getItem('llm_url') || localStorage.getItem('deepseek_api_endpoint') || PROVIDERS[userApiProvider].url;
+    let userApiModel = localStorage.getItem('llm_model') || PROVIDERS[userApiProvider].model;
+    /** Geteilter Provider-Aufruf (deepseek/openai: Bearer+Chat-Completions, anthropic: x-api-key+Messages-API). */
+    async function callAI(system, user, opts) {
+      const { temperature = 0.3, maxTokens = 4000, key } = opts || {};
+      const apiKey = key || userApiKey;
+      const style = PROVIDERS[userApiProvider]?.style || 'openai';
+      let res;
+      if (style === 'anthropic') {
+        res = await fetch(userApiEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+          body: JSON.stringify({ model: userApiModel, max_tokens: maxTokens, system, messages: [{ role: 'user', content: user }] })
+        });
+      } else {
+        res = await fetch(userApiEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+          body: JSON.stringify({ model: userApiModel, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], temperature })
+        });
+      }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const text = style === 'anthropic' ? data?.content?.[0]?.text : data?.choices?.[0]?.message?.content;
+      if (!text) throw new Error('Keine Antwort');
+      return text.trim();
+    }
     let contextEntries = [];
     try { contextEntries = JSON.parse(localStorage.getItem('ccps_context_entries') || '[]'); } catch (e) { contextEntries = []; }
 
@@ -815,15 +860,35 @@ ALEX ist die Steuerungs- und Lernschicht über der Interaktion zwischen Mensch u
       const modal = document.getElementById('api-modal');
       modal.classList.toggle('hidden');
       if (!modal.classList.contains('hidden')) {
+        const sel = document.getElementById('api-provider-input');
+        if (!sel.options.length) {
+          sel.innerHTML = Object.entries(PROVIDERS).map(([k, v]) => `<option value="${k}">${escapeHtml(v.label)}</option>`).join('');
+          sel.onchange = () => {
+            const p = PROVIDERS[sel.value];
+            document.getElementById('api-endpoint-input').value = p.url;
+            document.getElementById('api-model-input').value = p.model;
+          };
+        }
+        sel.value = userApiProvider;
+        document.getElementById('api-model-input').value = userApiModel;
         document.getElementById('api-key-input').value = userApiKey;
         document.getElementById('api-endpoint-input').value = userApiEndpoint;
       }
     }
     function saveApiKey() {
+      userApiProvider = document.getElementById('api-provider-input').value || 'deepseek';
       userApiKey = document.getElementById('api-key-input').value.trim();
-      userApiEndpoint = document.getElementById('api-endpoint-input').value.trim() || 'https://api.deepseek.com/chat/completions';
-      localStorage.setItem('deepseek_api_key', userApiKey);
-      localStorage.setItem('deepseek_api_endpoint', userApiEndpoint);
+      userApiEndpoint = document.getElementById('api-endpoint-input').value.trim() || PROVIDERS[userApiProvider].url;
+      userApiModel = document.getElementById('api-model-input').value.trim() || PROVIDERS[userApiProvider].model;
+      localStorage.setItem('llm_provider', userApiProvider);
+      localStorage.setItem('llm_key', userApiKey);
+      localStorage.setItem('llm_url', userApiEndpoint);
+      localStorage.setItem('llm_model', userApiModel);
+      if (userApiProvider === 'deepseek') {
+        // Rueckwaerts-kompatibel fuer Kopien, die noch nicht auf llm_* migriert sind.
+        localStorage.setItem('deepseek_api_key', userApiKey);
+        localStorage.setItem('deepseek_api_endpoint', userApiEndpoint);
+      }
       updateApiKeyStatusDisplay();
       if (userApiKey) document.getElementById('content-deepseek-key').value = userApiKey;
       toggleApiKeyModal();
@@ -831,7 +896,8 @@ ALEX ist die Steuerungs- und Lernschicht über der Interaktion zwischen Mensch u
     }
     function updateApiKeyStatusDisplay() {
       const el = document.getElementById('api-key-status');
-      el.innerText = userApiKey ? 'DeepSeek: Key Aktiv ⚡' : 'DeepSeek: –';
+      const label = PROVIDERS[userApiProvider]?.label || userApiProvider;
+      el.innerText = userApiKey ? `${label}: Key Aktiv ⚡` : `${label}: –`;
       el.classList.toggle('text-emerald-400', !!userApiKey);
     }
 
@@ -1001,7 +1067,7 @@ Strukturiere die Umsetzung in klare Schritte. Ändere nur das Nötigste. Zeige a
     async function enhancePromptWithAI() {
       const task = document.getElementById('task-input').value.trim();
       if (!task) { alert('Bitte zuerst beschreiben, was du bauen/ändern willst.'); return; }
-      if (!userApiKey) { alert('Kein DeepSeek API Key hinterlegt (oben rechts).'); return; }
+      if (!userApiKey) { alert(`Kein ${PROVIDERS[userApiProvider]?.label || 'API'}-Key hinterlegt (oben rechts).`); return; }
 
       const btn = document.getElementById('ai-enhance-btn');
       const original = btn.innerHTML;
@@ -1014,24 +1080,11 @@ Strukturiere die Umsetzung in klare Schritte. Ändere nur das Nötigste. Zeige a
       const userContent = ctxExcerpt ? `[PROJEKT-KONTEXT]\n${ctxExcerpt}\n\n[AUFGABE]\n${task}` : task;
 
       try {
-        const response = await fetch(userApiEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${userApiKey}` },
-          body: JSON.stringify({
-            model: 'deepseek-chat',
-            messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userContent }],
-            temperature: 0.4
-          })
-        });
-        if (!response.ok) throw new Error(`${response.status}`);
-        const data = await response.json();
-        const text = data?.choices?.[0]?.message?.content;
-        if (text) {
-          document.getElementById('prompt-output').innerText = text.trim();
-          showToast('Mit DeepSeek optimiert!');
-        } else throw new Error('Keine Antwort');
+        const text = await callAI(systemPrompt, userContent, { temperature: 0.4 });
+        document.getElementById('prompt-output').innerText = text;
+        showToast(`Mit ${PROVIDERS[userApiProvider]?.label || 'KI'} optimiert!`);
       } catch (err) {
-        alert('DeepSeek-Fehler (evtl. CORS): ' + err.message + '. Deterministischer Generator funktioniert weiter.');
+        alert(`${PROVIDERS[userApiProvider]?.label || 'API'}-Fehler (evtl. CORS): ` + err.message + '. Deterministischer Generator funktioniert weiter.');
         generatePrompt();
       } finally {
         btn.innerHTML = original; btn.disabled = false;
@@ -1566,20 +1619,7 @@ Strukturiere die Umsetzung in klare Schritte. Ändere nur das Nötigste. Zeige a
 
     // ---------- KI-Funktionen ----------
     async function planCallAI(system, user, temperature) {
-      const response = await fetch(userApiEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${userApiKey}` },
-        body: JSON.stringify({
-          model: 'deepseek-chat',
-          messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
-          temperature
-        })
-      });
-      if (!response.ok) throw new Error('HTTP ' + response.status);
-      const data = await response.json();
-      const text = data?.choices?.[0]?.message?.content;
-      if (!text) throw new Error('Keine Antwort');
-      return text.trim();
+      return callAI(system, user, { temperature });
     }
 
     function planAiExcerpts() {
@@ -1753,7 +1793,7 @@ Regeln:
       const log = document.getElementById('session-log').value.trim();
       if (!log) { alert('Bitte Session-Verlauf einfügen.'); return; }
       if (!userApiKey) {
-        alert('Kein DeepSeek Key – nutze die lokale Analyse.');
+        alert(`Kein ${PROVIDERS[userApiProvider]?.label || 'API'}-Key – nutze die lokale Analyse.`);
         analyzeSessionLocal();
         return;
       }
@@ -1772,26 +1812,9 @@ Regeln:
 Antworte auf Deutsch als strukturiertes Markdown. Keine Präambel.`;
 
       try {
-        const response = await fetch(userApiEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${userApiKey}` },
-          body: JSON.stringify({
-            model: 'deepseek-chat',
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: (focus ? `Fokus: ${focus}\n\n` : '') + truncated }
-            ],
-            temperature: 0.3
-          })
-        });
-        if (!response.ok) throw new Error(response.status);
-        const data = await response.json();
-        const text = data?.choices?.[0]?.message?.content;
-        if (text) {
-          lastSessionAnalysis = text.trim();
-          document.getElementById('session-output').innerText = lastSessionAnalysis;
-          showToast('KI-Analyse fertig');
-        } else throw new Error('Keine Antwort');
+        lastSessionAnalysis = await callAI(systemPrompt, (focus ? `Fokus: ${focus}\n\n` : '') + truncated, { temperature: 0.3 });
+        document.getElementById('session-output').innerText = lastSessionAnalysis;
+        showToast('KI-Analyse fertig');
       } catch (err) {
         alert('KI-Analyse fehlgeschlagen: ' + err.message);
         analyzeSessionLocal();
@@ -1904,7 +1927,7 @@ Antworte auf Deutsch als strukturiertes Markdown. Keine Präambel.`;
 
     async function generateContentPosts() {
       const key = document.getElementById('content-deepseek-key').value.trim() || userApiKey;
-      if (!key) { alert('DeepSeek Key fehlt.'); return; }
+      if (!key) { alert(`${PROVIDERS[userApiProvider]?.label || 'API'}-Key fehlt.`); return; }
 
       const source = document.getElementById('content-source').value.trim();
       if (!source) { alert('Bitte Quelle / Kontext angeben.'); return; }
@@ -1959,18 +1982,7 @@ Antworte NUR mit JSON: {"text":"...","hashtags":["..."],"image_prompt":"..."}.
 text ohne Hashtags, unter ${p.limit} Zeichen. image_prompt nur wenn der Kontext ein ehrliches Schema hergibt.`;
           const userPrompt = `Plattform: ${p.label}\nZielgruppe: ${audience}\nTon: ${tone}\nCTA: ${ctaMap[cta] || ''}\nFixe Hashtags: ${hashtags || 'keine'}\n\nInhalt/Kontext:\n${source.slice(0, 4000)}`;
 
-          const res = await fetch(userApiEndpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-            body: JSON.stringify({
-              model: 'deepseek-chat',
-              messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-              temperature: 0.8
-            })
-          });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const data = await res.json();
-          let raw = data.choices?.[0]?.message?.content || '';
+          let raw = await callAI(systemPrompt, userPrompt, { temperature: 0.8, key });
           raw = raw.replace(/^```json/i, '').replace(/```$/g, '').trim();
           const parsed = JSON.parse(raw);
 
@@ -2074,8 +2086,8 @@ text ohne Hashtags, unter ${p.limit} Zeichen. image_prompt nur wenn der Kontext 
 
     function copyStudioKeyHint() {
       const hint = userApiKey
-        ? 'DeepSeek-Key ist im Studio gespeichert (localStorage: deepseek_api_key). Genesis liest denselben Key automatisch, wenn beide Dateien im gleichen Browser geöffnet werden.'
-        : 'Im Studio oben rechts einen DeepSeek-Key speichern — Genesis nutzt denselben localStorage-Eintrag.';
+        ? `${PROVIDERS[userApiProvider]?.label || 'KI'}-Key ist im Studio gespeichert (localStorage: llm_key). Genesis liest denselben Anbieter+Key automatisch, wenn beide Dateien im gleichen Browser geöffnet werden.`
+        : 'Im Studio oben rechts einen KI-Key speichern — Genesis nutzt denselben localStorage-Eintrag.';
       copyDirectText(hint);
     }
 

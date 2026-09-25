@@ -58,7 +58,7 @@
         <a href="alex-prompt-content-studio.html" class="text-xs text-slate-400 hover:text-slate-200 px-2 py-1">← Studio</a>
         <button onclick="toggleApiKeyModal()" class="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-2 transition">
           <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 0121 9z"></path></svg>
-          <span id="api-key-status">DeepSeek: –</span>
+          <span id="api-key-status">KI-Anbieter: –</span>
         </button>
       </div>
     </div>
@@ -136,7 +136,7 @@
       <div class="lg:col-span-5 space-y-4">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
           <h2 class="text-base font-semibold">2. Fehler &amp; Muster erkennen</h2>
-          <p class="text-xs text-slate-400">Lokale Heuristiken laufen ohne API. KI-Analyse (DeepSeek) findet subtilere Fehlentscheidungen.</p>
+          <p class="text-xs text-slate-400">Lokale Heuristiken laufen ohne API. KI-Analyse (eigener Key: DeepSeek, OpenAI, Anthropic oder eigener Endpunkt) findet subtilere Fehlentscheidungen.</p>
 
           <div class="space-y-2 text-xs">
             <label class="flex items-center gap-2 p-2 bg-slate-950 border border-slate-800 rounded-lg cursor-pointer"><input type="checkbox" id="d-session" checked class="rounded border-slate-700 text-amber-500"> Session-Heuristiken (sed, Tests, Claims…)</label>
@@ -368,9 +368,13 @@
   <!-- API Key Modal -->
   <div id="api-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4">
     <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl">
-      <h3 class="text-lg font-semibold">DeepSeek API</h3>
-      <p class="text-xs text-slate-400">Gleicher Key wie Studio/Genesis (localStorage). Wird nur im Browser gehalten.</p>
-      <input type="password" id="api-key-input" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm font-mono" placeholder="sk-…">
+      <h3 class="text-lg font-semibold">KI-Anbieter</h3>
+      <p class="text-xs text-slate-400">Gleiche Einstellungen wie Studio/Genesis (localStorage, gleicher Browser). Wird nur im Browser gehalten.</p>
+      <div class="grid grid-cols-2 gap-2">
+        <select id="api-provider-input" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm"></select>
+        <input type="text" id="api-model-input" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm font-mono" placeholder="Modellname">
+      </div>
+      <input type="password" id="api-key-input" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm font-mono" placeholder="API-Key">
       <input type="text" id="api-endpoint-input" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs font-mono" placeholder="https://api.deepseek.com/chat/completions">
       <div class="flex gap-2 justify-end">
         <button onclick="toggleApiKeyModal(false)" class="px-4 py-2 text-sm text-slate-400">Abbrechen</button>
@@ -384,6 +388,12 @@
 
 const STORAGE_CARDS = 'alex_fehler_karten_v1';
 const STORAGE_SOURCES = 'alex_fehler_quellen_v1';
+const PROVIDERS = {
+  deepseek: { label: 'DeepSeek', url: 'https://api.deepseek.com/chat/completions', model: 'deepseek-chat', style: 'openai' },
+  openai: { label: 'OpenAI', url: 'https://api.openai.com/v1/chat/completions', model: 'gpt-4o-mini', style: 'openai' },
+  anthropic: { label: 'Anthropic', url: 'https://api.anthropic.com/v1/messages', model: 'claude-sonnet-5', style: 'anthropic' },
+  custom: { label: 'Eigener Anbieter (OpenAI-kompatibel)', url: '', model: '', style: 'openai' }
+};
 const TAGS = [
   'scope-creep', 'test-manipulation', 'claim-without-verify', 'sed-on-code',
   'sunk-cost', 'secret-leak', 'ungefragtes-refactoring', 'git-checkpoint-fehlt',
@@ -471,8 +481,10 @@ const HOOK_HINTS = {
 let sources = [];
 let findings = [];
 let cards = [];
+let userApiProvider = 'deepseek';
 let userApiKey = '';
-let userApiEndpoint = 'https://api.deepseek.com/chat/completions';
+let userApiEndpoint = PROVIDERS.deepseek.url;
+let userApiModel = PROVIDERS.deepseek.model;
 let reviewQueue = [];
 let reviewIndex = 0;
 let editingCardId = null;
@@ -523,8 +535,12 @@ function loadState() {
   try {
     cards = JSON.parse(localStorage.getItem(STORAGE_CARDS) || '[]');
     sources = JSON.parse(localStorage.getItem(STORAGE_SOURCES) || '[]');
-    userApiKey = localStorage.getItem('deepseek_api_key') || '';
-    userApiEndpoint = localStorage.getItem('deepseek_api_endpoint') || userApiEndpoint;
+    // Geteilte Einstellungen mit Studio/Genesis (gleicher Browser). Alte deepseek_*-Keys
+    // (vor Multi-Provider) werden als Fallback gelesen, falls llm_* noch nicht existiert.
+    userApiProvider = localStorage.getItem('llm_provider') || 'deepseek';
+    userApiKey = localStorage.getItem('llm_key') || localStorage.getItem('deepseek_api_key') || '';
+    userApiEndpoint = localStorage.getItem('llm_url') || localStorage.getItem('deepseek_api_endpoint') || PROVIDERS[userApiProvider].url;
+    userApiModel = localStorage.getItem('llm_model') || PROVIDERS[userApiProvider].model;
   } catch (e) { cards = []; sources = []; }
   updateApiStatus();
   renderSources();
@@ -542,7 +558,8 @@ function persistSources() {
   }))));
 }
 function updateApiStatus() {
-  document.getElementById('api-key-status').textContent = userApiKey ? 'DeepSeek: OK' : 'DeepSeek: –';
+  const label = PROVIDERS[userApiProvider]?.label || userApiProvider;
+  document.getElementById('api-key-status').textContent = userApiKey ? `${label}: OK` : `${label}: –`;
 }
 function updateCardBadge() {
   const b = document.getElementById('card-badge');
@@ -558,15 +575,35 @@ function toggleApiKeyModal(show) {
   if (show === false) { m.classList.add('hidden'); m.classList.remove('flex'); return; }
   m.classList.toggle('hidden');
   m.classList.toggle('flex');
+  const sel = document.getElementById('api-provider-input');
+  if (!sel.options.length) {
+    sel.innerHTML = Object.entries(PROVIDERS).map(([k, v]) => `<option value="${k}">${escapeHtml(v.label)}</option>`).join('');
+    sel.onchange = () => {
+      const p = PROVIDERS[sel.value];
+      document.getElementById('api-endpoint-input').value = p.url;
+      document.getElementById('api-model-input').value = p.model;
+    };
+  }
+  sel.value = userApiProvider;
+  document.getElementById('api-model-input').value = userApiModel;
   document.getElementById('api-key-input').value = userApiKey;
   document.getElementById('api-endpoint-input').value = userApiEndpoint;
 }
 function saveApiKey() {
+  userApiProvider = document.getElementById('api-provider-input').value || 'deepseek';
   userApiKey = document.getElementById('api-key-input').value.trim();
-  userApiEndpoint = document.getElementById('api-endpoint-input').value.trim() || 'https://api.deepseek.com/chat/completions';
+  userApiEndpoint = document.getElementById('api-endpoint-input').value.trim() || PROVIDERS[userApiProvider].url;
+  userApiModel = document.getElementById('api-model-input').value.trim() || PROVIDERS[userApiProvider].model;
   try {
-    localStorage.setItem('deepseek_api_key', userApiKey);
-    localStorage.setItem('deepseek_api_endpoint', userApiEndpoint);
+    localStorage.setItem('llm_provider', userApiProvider);
+    localStorage.setItem('llm_key', userApiKey);
+    localStorage.setItem('llm_url', userApiEndpoint);
+    localStorage.setItem('llm_model', userApiModel);
+    if (userApiProvider === 'deepseek') {
+      // Rueckwaerts-kompatibel fuer Kopien, die noch nicht auf llm_* migriert sind.
+      localStorage.setItem('deepseek_api_key', userApiKey);
+      localStorage.setItem('deepseek_api_endpoint', userApiEndpoint);
+    }
   } catch (e) {}
   updateApiStatus();
   toggleApiKeyModal(false);
@@ -920,9 +957,34 @@ function findingsToCards() {
   showToast(`${n} neue Karten, Wiederholungen aktualisiert`);
 }
 
+/** Geteilter Provider-Aufruf (deepseek/openai: Bearer+Chat-Completions, anthropic: x-api-key+Messages-API). */
+async function callAI(system, user, opts) {
+  const { temperature = 0.3, maxTokens = 4000 } = opts || {};
+  const style = PROVIDERS[userApiProvider]?.style || 'openai';
+  let res;
+  if (style === 'anthropic') {
+    res = await fetch(userApiEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': userApiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({ model: userApiModel, max_tokens: maxTokens, system, messages: [{ role: 'user', content: user }] })
+    });
+  } else {
+    res = await fetch(userApiEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${userApiKey}` },
+      body: JSON.stringify({ model: userApiModel, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], temperature })
+    });
+  }
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  const text = style === 'anthropic' ? data?.content?.[0]?.text : data?.choices?.[0]?.message?.content;
+  if (!text) throw new Error('Keine Antwort');
+  return text.trim();
+}
+
 async function runAIDetect() {
   if (!userApiKey) {
-    alert('Kein DeepSeek-Key. Lokal scannen oder Key speichern.');
+    alert(`Kein ${PROVIDERS[userApiProvider]?.label || 'API'}-Key. Lokal scannen oder Key speichern.`);
     runLocalDetect();
     return;
   }
@@ -940,21 +1002,7 @@ Antworte NUR mit validem JSON-Array:
 Max. 12 Einträge. Keine Wertung der Person. Nur belegbare Muster. Sprache: Deutsch.`;
 
   try {
-    const res = await fetch(userApiEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${userApiKey}` },
-      body: JSON.stringify({
-        model: 'deepseek-chat',
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: (focus ? `Fokus: ${focus}\n\n` : '') + blob }
-        ],
-        temperature: 0.3
-      })
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    let raw = data.choices?.[0]?.message?.content || '';
+    let raw = await callAI(system, (focus ? `Fokus: ${focus}\n\n` : '') + blob, { temperature: 0.3 });
     raw = raw.replace(/^```json\s*/i, '').replace(/```\s*$/g, '').trim();
     const arr = JSON.parse(raw);
     if (!Array.isArray(arr)) throw new Error('Kein Array');

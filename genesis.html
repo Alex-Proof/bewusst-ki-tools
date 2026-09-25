@@ -1508,12 +1508,17 @@ async function loadProjectFile(file, asCompare) {
 
 /* ============ Einstellungen ============ */
 function initSettings() {
-  // Shared key/endpoint with ALEX Prompt- & Content-Studio (same browser)
+  // Shared provider/key/endpoint/model mit ALEX Fehler-Labor / Prompt- & Content-Studio (gleicher
+  // Browser). Alte deepseek_*-Keys (vor Multi-Provider) werden als Fallback gelesen.
   try {
-    const sharedKey = localStorage.getItem('deepseek_api_key') || '';
-    const sharedUrl = localStorage.getItem('deepseek_api_endpoint') || '';
+    const sharedProvider = localStorage.getItem('llm_provider');
+    const sharedKey = localStorage.getItem('llm_key') || localStorage.getItem('deepseek_api_key') || '';
+    const sharedUrl = localStorage.getItem('llm_url') || localStorage.getItem('deepseek_api_endpoint') || '';
+    const sharedModel = localStorage.getItem('llm_model') || '';
+    if (sharedProvider && PROVIDERS[sharedProvider]) S.settings.provider = sharedProvider;
     if (sharedKey && !S.settings.key) S.settings.key = sharedKey;
-    if (sharedUrl && S.settings.provider === 'deepseek') S.settings.url = sharedUrl;
+    if (sharedUrl) S.settings.url = sharedUrl;
+    if (sharedModel) S.settings.model = sharedModel;
   } catch (e) { /* localStorage may be blocked */ }
 
   const sel = $('#stProvider'); sel.innerHTML = Object.entries(PROVIDERS).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join('');
@@ -1526,9 +1531,16 @@ function initSettings() {
     c.priceIn = $('#stPriceIn').value; c.priceOut = $('#stPriceOut').value;
     c.weeksPerPhase = Math.min(12, Math.max(1, +$('#stWeeks').value || 4)); c.charsPerPhase = Math.min(120000, Math.max(6000, +$('#stChars').value || 24000));
     try {
-      if (c.provider === 'deepseek' && c.key) {
-        localStorage.setItem('deepseek_api_key', c.key);
-        if (c.url) localStorage.setItem('deepseek_api_endpoint', c.url);
+      if (c.key) {
+        localStorage.setItem('llm_provider', c.provider);
+        localStorage.setItem('llm_key', c.key);
+        if (c.url) localStorage.setItem('llm_url', c.url);
+        if (c.model) localStorage.setItem('llm_model', c.model);
+        if (c.provider === 'deepseek') {
+          // Rueckwaerts-kompatibel fuer Kopien, die noch nicht auf llm_* migriert sind.
+          localStorage.setItem('deepseek_api_key', c.key);
+          if (c.url) localStorage.setItem('deepseek_api_endpoint', c.url);
+        }
       }
     } catch (e) {}
     $('#dlgSettings').close();
